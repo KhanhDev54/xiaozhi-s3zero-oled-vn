@@ -1,0 +1,119 @@
+name: Build ESP32-S3 Zero OLED 0.96" (VN)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-v1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build esp32s3-zero-oled-096
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: espressif/idf:release-v6.1
+    env:
+      BOARD: esp32s3-zero-oled
+      VARIANT: esp32s3-zero-oled-096
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build firmware
+        shell: bash
+        run: |
+          git config --global --add safe.directory '*'
+          source $IDF_PATH/export.sh
+          python scripts/build.py "$BOARD" --name "$VARIANT" --language vi-VN --wake-word wn9_sophia_tts
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.VARIANT }}_${{ github.sha }}
+          path: build/merged-binary.bin
+          if-no-files-found: error
+          retention-days: 30
+
+  pages:
+    name: Publish web flasher (GitHub Pages)
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      VARIANT: esp32s3-zero-oled-096
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.VARIANT }}_${{ github.sha }}
+          path: dl
+
+      - name: Assemble site
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p site/firmware
+          cp web/* site/
+          BIN=$(find dl -name merged-binary.bin | head -1)
+          cp "$BIN" site/firmware/xiaozhi-s3zero-oled-096.bin
+          VERSION=$(sed -n 's/^set(PROJECT_VER "\(.*\)")/\1/p' CMakeLists.txt)
+          SIZE=$(stat -c %s site/firmware/xiaozhi-s3zero-oled-096.bin)
+          DATE=$(date -u +%Y-%m-%d)
+          cat > site/firmware.json <<JSON
+          {
+            "firmwares": [
+              {
+                "name": "Xiaozhi VN Zero OLED 0.96\"",
+                "file": "firmware/xiaozhi-s3zero-oled-096.bin",
+                "address": 0,
+                "chip": "ESP32-S3",
+                "version": "${VERSION}",
+                "commit": "${GITHUB_SHA}",
+                "date": "${DATE}",
+                "size": ${SIZE},
+                "flash_mb": 4,
+                "board": "ESP32-S3 Zero + OLED 0.96\" (4MB)",
+                "notes": "SSD1306 128x64 · INMP441 + MAX98357A · tiếng Việt · từ đánh thức Sophia · báo thức, hẹn giờ, âm lịch"
+              }
+            ]
+          }
+          JSON
+          python3 -m json.tool site/firmware.json > /dev/null
+          ls -la site site/firmware
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 600000

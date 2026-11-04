@@ -1,174 +1,158 @@
-# An MCP-based Chatbot
+# xiaozhi-s3zero-oled-vn
 
-(English | [中文](README_zh.md) | [日本語](README_ja.md))
+Firmware chatbot AI Xiaozhi **tiếng Việt** cho mạch tự lắp **ESP32-S3 Zero + OLED 0.96"**
+(INMP441 + MAX98357A), theo sơ đồ *"ChatBot AI (Xiaozhi) mod by tandev"*.
+Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) v2.5.3.
 
-## Introduction
+👉 **Trang nạp firmware:** https://khanhdev54.github.io/xiaozhi-s3zero-oled-vn/
+(dùng chung với mạch 2.8" — trang liệt kê firmware của cả hai mạch)
 
-👉 [Human: Give AI a camera vs AI: Instantly finds out the owner hasn't washed hair for three days【bilibili】](https://www.bilibili.com/video/BV1bpjgzKEhd/)
+---
 
-👉 [Handcraft your AI girlfriend, beginner's guide【bilibili】](https://www.bilibili.com/video/BV1XnmFYLEJN/)
+## Mục lục
 
-As a voice interaction entry, the XiaoZhi AI chatbot leverages the AI capabilities of large models like Qwen / DeepSeek, and achieves multi-terminal control via the MCP protocol.
+1. [Tính năng](#1-tính-năng)
+2. [Phần cứng & sơ đồ chân](#2-phần-cứng--sơ-đồ-chân)
+3. [Nạp firmware](#3-nạp-firmware)
+4. [Cài Wi-Fi & kích hoạt](#4-cài-wi-fi--kích-hoạt)
+5. [Trò chuyện](#5-trò-chuyện)
+6. [Nút bấm & đèn](#6-nút-bấm--đèn)
+7. [Báo thức, hẹn giờ, âm lịch](#7-báo-thức-hẹn-giờ-âm-lịch)
+8. [Xử lý sự cố](#8-xử-lý-sự-cố)
+9. [Dành cho người phát triển](#9-dành-cho-người-phát-triển)
+10. [Nguồn gốc & giấy phép](#10-nguồn-gốc--giấy-phép)
 
-<img src="docs/mcp-based-graph.jpg" alt="Control everything via MCP" width="320">
+---
 
-## Recent Updates
+## 1. Tính năng
 
-- The project now requires ESP-IDF v6.0.1 or later. [ESP-IDF `release/v6.1`](https://github.com/espressif/esp-idf/tree/release/v6.1) is the recommended SDK branch. ESP-IDF 5.x is no longer supported. The current matrix contains 171 variants; ESP32-S31 builds require IDF 6.1 or later.
-- MQTT and BluFi cryptographic code has migrated to PSA Crypto. IDF 6 component splits and third-party dependency compatibility have also been addressed.
-- Audio pipeline concurrency, MQTT/UDP packet validation, and release-matrix selection have been hardened.
-- ESP32-P4 Rev1 and Rev3 are both supported on IDF 6 with ESP-SR 2.4.7.
+| Tính năng | Ghi chú |
+|---|---|
+| 🗣️ Trò chuyện AI bằng giọng nói | Qua server xiaozhi.me, trả lời tiếng Việt |
+| 🇻🇳 Giao diện & âm báo tiếng Việt | Ngôn ngữ firmware `vi-VN` |
+| 👂 Từ đánh thức **"Sophia"** | Nhận dạng offline trên chip |
+| 🖥️ OLED 0.96" 128x64 | Trạng thái, cảm xúc, nội dung trò chuyện |
+| ⏰ Báo thức, hẹn giờ | Ra lệnh bằng giọng, lưu khi tắt nguồn |
+| 📅 Âm lịch | Hỏi "hôm nay âm lịch ngày mấy", can chi, giờ hoàng đạo |
+| 💡 Đèn GPIO12 | Bật/tắt bằng giọng nói |
 
-### Features Implemented
+## 2. Phần cứng & sơ đồ chân
 
-- Wi-Fi, wired Ethernet, USB RNDIS, and ML307/EC801E or NT26 Cat.1 4G networking; supported boards can switch between Wi-Fi and 4G
-- Offline voice wake-up with [ESP-SR](https://github.com/espressif/esp-sr), including customizable wake words
-- Two communication transports: [WebSocket](docs/websocket.md) and [MQTT + UDP](docs/mqtt-udp.md)
-- Opus audio streaming with conventional streaming ASR + LLM + TTS pipelines and Realtime end-to-end voice models; AEC-capable hardware supports realtime full-duplex interaction
-- Speaker recognition, identifies the current speaker [3D Speaker](https://github.com/modelscope/3D-Speaker)
-- OLED / LCD displays with emoji and rich expression support, plus camera vision input on supported boards
-- Battery display and power management
-- 39 interface languages, with localized voice prompts where available and English fallback
-- ESP32, ESP32-C3, ESP32-C5, ESP32-C6, ESP32-S3, and ESP32-P4 chip platforms
-- Wi-Fi provisioning through hotspot or BluFi
-- Device-side MCP for device control (Speaker, LED, Servo, GPIO, etc.)
-- Cloud-side MCP to extend large model capabilities (smart home control, PC desktop operation, knowledge search, email, etc.)
-- Customizable wake words, fonts, emojis, and chat backgrounds with online web-based editing ([Custom Assets Generator](https://github.com/78/xiaozhi-assets-generator))
+- **Waveshare ESP32-S3 Zero** (4MB Flash, 2MB PSRAM)
+- OLED **SSD1306 0.96" 128x64** I2C (địa chỉ 0x3C)
+- Micro **INMP441**, khuếch đại **MAX98357A** + loa
+- 3 nút bấm, 1 LED, sạc pin TP4056 (tuỳ chọn)
 
-## Hardware
+| Thiết bị | Chân thiết bị | ESP32-S3 Zero |
+|---|---|---|
+| OLED | VCC / GND / SCL / SDA | 3V3 / GND / **GPIO9** / **GPIO8** |
+| MAX98357A | DIN / BCLK / LRC | **GPIO5** / **GPIO6** / **GPIO7** |
+| MAX98357A | VIN / GAIN / SD / GND | 5V / GND / 5V / GND |
+| INMP441 | WS / SCK / SD | **GPIO2** / **GPIO3** / **GPIO4** |
+| INMP441 | VDD / GND / L/R | 3V3 / GND / GND |
+| Nút đánh thức | (nối GND khi nhấn) | **GPIO1** |
+| Nút tăng âm lượng | (nối GND khi nhấn) | **GPIO10** |
+| Nút giảm âm lượng | (nối GND khi nhấn) | **GPIO11** |
+| LED / đèn ngoài | (qua điện trở 220–330Ω) | **GPIO12** |
+| LED RGB trên bo | WS2812 | GPIO21 (trạng thái) |
 
-### Breadboard DIY Practice
+## 3. Nạp firmware
 
-See the Feishu document tutorial:
+1. Mở **https://khanhdev54.github.io/xiaozhi-s3zero-oled-vn/** bằng **Chrome/Edge** trên máy tính.
+2. Cắm mạch Zero bằng cáp USB-C **có truyền dữ liệu**.
+3. Bấm **Kết nối** → chọn cổng COM → **Connect**.
+   Không thấy cổng: **giữ BOOT**, cắm lại cáp (hoặc bấm RESET), thả BOOT.
+4. Trong danh sách, chọn firmware ở nhóm **"ESP32-S3 Zero + OLED 0.96" (4MB)"** (đã chọn sẵn).
+5. Lần đầu nạp: tích **"Xoá toàn bộ flash trước khi nạp"**.
+6. Bấm **Bắt đầu nạp**. Xong thì bấm RESET nếu màn hình chưa sáng.
 
-👉 ["XiaoZhi AI Chatbot Encyclopedia"](https://ccnphfhqs21z.feishu.cn/wiki/F5krwD16viZoF0kKkvDcrZNYnhb?from=from_copylink)
+> Trang sẽ **cảnh báo nếu chọn nhầm** firmware 16MB của mạch 2.8" cho mạch Zero 4MB.
 
-Breadboard demo:
+Tải file về tự nạp: tab **Actions** → lần chạy mới nhất ✓ → **Artifacts** → `merged-binary.bin`
+→ nạp ở địa chỉ `0x0`.
 
-![Breadboard Demo](docs/v1/wiring2.jpg)
+## 4. Cài Wi-Fi & kích hoạt
 
-### Supports 138 Board Directories and 171 Release Variants (Partial List)
+1. Lần đầu, màn hình hiện tên Wi-Fi mạch phát ra (bắt đầu bằng `Xiaozhi`) và địa chỉ cài đặt.
+2. Điện thoại kết nối Wi-Fi đó → chọn Wi-Fi nhà (**2.4GHz**) → nhập mật khẩu.
+3. Mạch đọc **mã kích hoạt 6 số** → vào **https://xiaozhi.me** → Console → thêm thiết bị → nhập mã.
+4. Trong cấu hình Agent trên xiaozhi.me, chọn ngôn ngữ / giọng đọc tiếng Việt.
 
-- <a href="https://oshwhub.com/li-chuang-kai-fa-ban/li-chuang-shi-zhan-pai-esp32-s3-kai-fa-ban" target="_blank" title="LiChuang ESP32-S3 Development Board">LiChuang ESP32-S3 Development Board</a>
-- <a href="https://github.com/espressif/esp-box" target="_blank" title="Espressif ESP32-S3-BOX-3">Espressif ESP32-S3-BOX-3</a>
-- <a href="https://docs.m5stack.com/zh_CN/core/CoreS3" target="_blank" title="M5Stack CoreS3">M5Stack CoreS3</a>
-- <a href="https://docs.m5stack.com/en/atom/Atomic%20Echo%20Base" target="_blank" title="AtomS3R + Echo Base">M5Stack AtomS3R + Echo Base</a>
-- <a href="https://gf.bilibili.com/item/detail/1108782064" target="_blank" title="Magic Button 2.4">Magic Button 2.4</a>
-- <a href="https://www.waveshare.net/shop/ESP32-S3-Touch-AMOLED-1.8.htm" target="_blank" title="Waveshare ESP32-S3-Touch-AMOLED-1.8">Waveshare ESP32-S3-Touch-AMOLED-1.8</a>
-- <a href="https://github.com/Xinyuan-LilyGO/T-Circle-S3" target="_blank" title="LILYGO T-Circle-S3">LILYGO T-Circle-S3</a>
-- <a href="https://oshwhub.com/tenclass01/xmini_c3" target="_blank" title="XiaGe Mini C3">XiaGe Mini C3</a>
-- <a href="https://oshwhub.com/movecall/cuican-ai-pendant-lights-up-y" target="_blank" title="Movecall CuiCan ESP32S3">CuiCan AI Pendant</a>
-- <a href="https://github.com/WMnologo/xingzhi-ai" target="_blank" title="WMnologo-Xingzhi-1.54">WMnologo-Xingzhi-1.54TFT</a>
-- <a href="https://www.seeedstudio.com/SenseCAP-Watcher-W1-A-p-5979.html" target="_blank" title="SenseCAP Watcher">SenseCAP Watcher</a>
-- <a href="https://www.bilibili.com/video/BV1BHJtz6E2S/" target="_blank" title="ESP-HI Low Cost Robot Dog">ESP-HI Low Cost Robot Dog</a>
+Đổi Wi-Fi sau này: bấm nút đánh thức (GPIO1) **lúc mạch đang khởi động** để vào lại chế độ cài mạng.
 
-<div style="display: flex; justify-content: space-between;">
-  <a href="docs/v1/lichuang-s3.jpg" target="_blank" title="LiChuang ESP32-S3 Development Board">
-    <img src="docs/v1/lichuang-s3.jpg" width="240" />
-  </a>
-  <a href="docs/v1/espbox3.jpg" target="_blank" title="Espressif ESP32-S3-BOX3">
-    <img src="docs/v1/espbox3.jpg" width="240" />
-  </a>
-  <a href="docs/v1/m5cores3.jpg" target="_blank" title="M5Stack CoreS3">
-    <img src="docs/v1/m5cores3.jpg" width="240" />
-  </a>
-  <a href="docs/v1/atoms3r.jpg" target="_blank" title="AtomS3R + Echo Base">
-    <img src="docs/v1/atoms3r.jpg" width="240" />
-  </a>
-  <a href="docs/v1/magiclick.jpg" target="_blank" title="Magic Button 2.4">
-    <img src="docs/v1/magiclick.jpg" width="240" />
-  </a>
-  <a href="docs/v1/waveshare.jpg" target="_blank" title="Waveshare ESP32-S3-Touch-AMOLED-1.8">
-    <img src="docs/v1/waveshare.jpg" width="240" />
-  </a>
-  <a href="docs/v1/lilygo-t-circle-s3.jpg" target="_blank" title="LILYGO T-Circle-S3">
-    <img src="docs/v1/lilygo-t-circle-s3.jpg" width="240" />
-  </a>
-  <a href="docs/v1/xmini-c3.jpg" target="_blank" title="XiaGe Mini C3">
-    <img src="docs/v1/xmini-c3.jpg" width="240" />
-  </a>
-  <a href="docs/v1/movecall-cuican-esp32s3.jpg" target="_blank" title="CuiCan">
-    <img src="docs/v1/movecall-cuican-esp32s3.jpg" width="240" />
-  </a>
-  <a href="docs/v1/wmnologo_xingzhi_1.54.jpg" target="_blank" title="WMnologo-Xingzhi-1.54">
-    <img src="docs/v1/wmnologo_xingzhi_1.54.jpg" width="240" />
-  </a>
-  <a href="docs/v1/sensecap_watcher.jpg" target="_blank" title="SenseCAP Watcher">
-    <img src="docs/v1/sensecap_watcher.jpg" width="240" />
-  </a>
-  <a href="docs/v1/esp-hi.jpg" target="_blank" title="ESP-HI Low Cost Robot Dog">
-    <img src="docs/v1/esp-hi.jpg" width="240" />
-  </a>
-</div>
+> Giao diện xiaozhi.me có thể đổi theo thời gian; tên các mục chỉ mang tính tham khảo.
 
-## Software
+## 5. Trò chuyện
 
-### Firmware Flashing
+- Nói **"Sophia"** (đọc *"Sô-phia"*), hoặc bấm **nút đánh thức** (GPIO1).
+- Sau khi đánh thức, nói chuyện **bằng tiếng Việt** bình thường.
+- Đang nói / đang nghe: bấm nút đánh thức để ngắt / kết thúc.
 
-For beginners, it is recommended to use the firmware that can be flashed without setting up a development environment.
+## 6. Nút bấm & đèn
 
-The firmware connects to the official [xiaozhi.me](https://xiaozhi.me) server by default. Personal users can register an account to use the Qwen real-time model for free.
+| Nút | Bấm 1 lần | Giữ lâu |
+|---|---|---|
+| Đánh thức (GPIO1) | Bắt đầu / dừng trò chuyện | — |
+| Tăng âm lượng (GPIO10) | +10 | Âm lượng tối đa |
+| Giảm âm lượng (GPIO11) | −10 | Tắt tiếng |
 
-👉 [Beginner's Firmware Flashing Guide](https://ccnphfhqs21z.feishu.cn/wiki/Zpz4wXBtdimBrLk25WdcXzxcnNS)
+Đèn GPIO12: nói *"Bật đèn"*, *"Tắt đèn"*.
 
-### Development Environment
+## 7. Báo thức, hẹn giờ, âm lịch
 
-- Cursor or VSCode
-- Install the ESP-IDF plugin. The minimum SDK is [ESP-IDF v6.0.1](https://github.com/espressif/esp-idf/releases/tag/v6.0.1); [ESP-IDF `release/v6.1`](https://github.com/espressif/esp-idf/tree/release/v6.1) is recommended. ESP-IDF 5.x is not supported.
-- Linux is better than Windows for faster compilation and fewer driver issues
-- This project uses Google C++ code style, please ensure compliance when submitting code
+| Câu lệnh mẫu | Kết quả |
+|---|---|
+| *"Đặt báo thức 6 giờ 30 sáng"* | Báo thức một lần |
+| *"Báo thức 7 giờ mỗi ngày, nhãn đi làm"* | Báo thức lặp hằng ngày |
+| *"Mình có những báo thức nào?"* | Liệt kê báo thức |
+| *"Xoá hết báo thức"* | Xoá |
+| *"Hẹn giờ 10 phút"* | Đếm ngược |
+| *"Tắt báo thức"* | Tắt chuông đang kêu |
+| *"Hôm nay âm lịch ngày mấy?"*, *"Giờ hoàng đạo hôm nay?"* | Trả lời bằng giọng |
 
-Use the `release/v6.1` branch rather than the `v6.1` release tag: an ESP32-C3 Wi-Fi initialization failure with that tag is reported in [#2344](https://github.com/78/xiaozhi-esp32/issues/2344). After switching SDK revisions, run `git submodule update --init --recursive` in the ESP-IDF directory, source its `export.sh`, and run `idf.py fullclean` in this project before rebuilding.
+- Chuông kêu tối đa **1 phút**; bấm nút đánh thức hoặc bắt đầu nói chuyện để tắt.
+- Lưu tối đa 8 báo thức trong bộ nhớ mạch, **không mất khi tắt nguồn**.
+- Cần mạch đã có giờ chuẩn (đã kết nối mạng sau khi bật).
 
-### Developer Documentation
+## 8. Xử lý sự cố
 
-- [Custom Board Guide](docs/custom-board.md) - Learn how to create custom boards for XiaoZhi AI
-- [MCP Protocol IoT Control Usage](docs/mcp-usage.md) - Learn how to control IoT devices via MCP protocol
-- [MCP Protocol Interaction Flow](docs/mcp-protocol.md) - Device-side MCP protocol implementation
-- [MQTT + UDP Hybrid Communication Protocol Document](docs/mqtt-udp.md)
-- [A detailed WebSocket communication protocol document](docs/websocket.md)
+| Hiện tượng | Cách xử lý |
+|---|---|
+| Không thấy cổng COM | Cáp USB có dữ liệu; giữ BOOT khi cắm |
+| Màn OLED không sáng | Kiểm tra SDA=GPIO8, SCL=GPIO9, nguồn 3V3; OLED địa chỉ 0x3C |
+| Chữ OLED bị ngược | Đổi `DISPLAY_MIRROR_X/Y` trong `config.h` |
+| Không nghe tiếng | MAX98357A: DIN=5, BCLK=6, LRC=7, VIN 5V |
+| Không nhận giọng | INMP441: L/R nối GND, WS=2, SCK=3, SD=4 |
+| Khởi động lại liên tục | Nạp lại với ô *Xoá toàn bộ flash* |
 
-## Large Model Configuration
+## 9. Dành cho người phát triển
 
-If you already have a XiaoZhi AI chatbot device and have connected to the official server, you can log in to the [xiaozhi.me](https://xiaozhi.me) console for configuration.
+Mỗi lần push lên `main` (trừ khi chỉ sửa file `.md`), workflow
+[`build-zero-oled.yml`](.github/workflows/build-zero-oled.yml) build bản `esp32s3-zero-oled-096`
+bằng ESP-IDF 6.1 (`--language vi-VN --wake-word wn9_sophia_tts`) rồi đăng lên trang nạp.
 
-👉 [Backend Operation Video Tutorial (Old Interface)](https://www.bilibili.com/video/BV1jUCUY2EKM/)
+Build trên máy (ESP-IDF 6.0.1+, khuyên dùng 6.1):
 
-## Related Open Source Projects
+```
+python scripts/build.py esp32s3-zero-oled --name esp32s3-zero-oled-096 --language vi-VN --wake-word wn9_sophia_tts
+idf.py -p COM5 flash monitor
+```
 
-For server deployment on personal computers, refer to the following open-source projects:
+| File | Nội dung |
+|---|---|
+| `main/boards/esp32s3-zero-oled/config.h` | Sơ đồ chân, kiểu OLED, lật màn hình |
+| `main/boards/esp32s3-zero-oled/config.json` | Bản build (0.91" / 0.96" / 1.3" SH1106), flash 4MB |
+| `main/boards/esp32s3-zero-oled/alarm_manager.*` | Báo thức, hẹn giờ, lệnh âm lịch |
+| `main/boards/esp32s3-zero-oled/lunar_calendar.*` | Âm lịch Việt Nam |
+| `web/` | Trang nạp (dùng chung với repo mạch 2.8") |
 
-- [xinnan-tech/xiaozhi-esp32-server](https://github.com/xinnan-tech/xiaozhi-esp32-server) Python server
-- [joey-zhou/xiaozhi-esp32-server-java](https://github.com/joey-zhou/xiaozhi-esp32-server-java) Java server
-- [AnimeAIChat/xiaozhi-server-go](https://github.com/AnimeAIChat/xiaozhi-server-go) Golang server
-- [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang) Golang server
+Đổi từ đánh thức: sửa `--wake-word` trong workflow, ví dụ `wn9_alexa`, `wn9_jarvis_tts`, `wn9_hiesp`.
 
-Other client projects using the XiaoZhi communication protocol:
+## 10. Nguồn gốc & giấy phép
 
-- [huangjunsen0406/py-xiaozhi](https://github.com/huangjunsen0406/py-xiaozhi) Python client
-- [TOM88812/xiaozhi-android-client](https://github.com/TOM88812/xiaozhi-android-client) Android client
-- [100askTeam/xiaozhi-linux](http://github.com/100askTeam/xiaozhi-linux) Linux client by 100ask
-- [78/xiaozhi-sf32](https://github.com/78/xiaozhi-sf32) Bluetooth chip firmware by Sichuan
-- [QuecPython/solution-xiaozhiAI](https://github.com/QuecPython/solution-xiaozhiAI) QuecPython firmware by Quectel
-
-Custom Assets Tools:
-
-- [78/xiaozhi-assets-generator](https://github.com/78/xiaozhi-assets-generator) Custom Assets Generator (Wake words, fonts, emojis, backgrounds)
-
-## About the Project
-
-This is an open-source ESP32 project, released under the MIT license, allowing anyone to use it for free, including for commercial purposes.
-
-We hope this project helps everyone understand AI hardware development and apply rapidly evolving large language models to real hardware devices.
-
-If you have any ideas or suggestions, please feel free to raise Issues or join our [Discord](https://discord.gg/C759fGMBcZ) or QQ group: 1095994019
-
-## Star History
-
-<a href="https://star-history.com/#78/xiaozhi-esp32&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=78/xiaozhi-esp32&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=78/xiaozhi-esp32&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=78/xiaozhi-esp32&type=Date" />
- </picture>
-</a>
+- Dựa trên [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) (commit `a73e9a7`, v2.5.3).
+  README gốc: [README_upstream.md](README_upstream.md).
+- Sơ đồ chân theo hình *"ChatBot AI (Xiaozhi) mod by tandev"*.
+- Thuật toán âm lịch của Hồ Ngọc Đức.
+- Trang nạp dùng [esptool-js](https://github.com/espressif/esptool-js) của Espressif.
+- Giấy phép MIT — xem [LICENSE](LICENSE).
