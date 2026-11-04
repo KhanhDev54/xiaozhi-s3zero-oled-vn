@@ -120,7 +120,7 @@ void IdleScreen::Tick() {
 
     // Use the theme's text font (supports Vietnamese once assets are loaded)
     auto* line = static_cast<lv_obj_t*>(line_label_);
-    lv_obj_set_style_text_font(line, lv_obj_get_style_text_font(lv_screen_active(), 0), 0);
+    lv_obj_set_style_text_font(line, lv_obj_get_style_text_font(lv_screen_active(), LV_PART_MAIN), 0);
 
     std::string text;
     WeatherNow w = InfoServices::GetInstance().GetWeather();
