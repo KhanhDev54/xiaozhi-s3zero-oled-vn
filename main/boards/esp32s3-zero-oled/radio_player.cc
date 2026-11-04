@@ -12,6 +12,7 @@
 
 #include "application.h"
 #include "board.h"
+#include "display.h"
 #include "mcp_server.h"
 
 #define TAG "Radio"
