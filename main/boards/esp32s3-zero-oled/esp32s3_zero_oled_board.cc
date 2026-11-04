@@ -8,6 +8,8 @@
 #include "mcp_server.h"
 #include "lamp_controller.h"
 #include "alarm_manager.h"
+#include "idle_screen.h"
+#include "info_services.h"
 #include "led/single_led.h"
 #include "assets/lang_config.h"
 
@@ -102,6 +104,7 @@ private:
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
+            IdleScreen::GetInstance().Bump();
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting) {
                 EnterWifiConfigMode();
@@ -111,6 +114,7 @@ private:
         });
 
         volume_up_button_.OnClick([this]() {
+            IdleScreen::GetInstance().Bump();
             auto codec = GetAudioCodec();
             auto volume = codec->output_volume() + 10;
             if (volume > 100) {
@@ -121,11 +125,13 @@ private:
         });
 
         volume_up_button_.OnLongPress([this]() {
+            IdleScreen::GetInstance().Bump();
             GetAudioCodec()->SetOutputVolume(100);
             GetDisplay()->ShowNotification(Lang::Strings::MAX_VOLUME);
         });
 
         volume_down_button_.OnClick([this]() {
+            IdleScreen::GetInstance().Bump();
             auto codec = GetAudioCodec();
             auto volume = codec->output_volume() - 10;
             if (volume < 0) {
@@ -136,6 +142,7 @@ private:
         });
 
         volume_down_button_.OnLongPress([this]() {
+            IdleScreen::GetInstance().Bump();
             GetAudioCodec()->SetOutputVolume(0);
             GetDisplay()->ShowNotification(Lang::Strings::MUTED);
         });
@@ -146,6 +153,12 @@ private:
         static LampController lamp(LAMP_GPIO);
         // Báo thức, hẹn giờ, âm lịch (self.alarm.*, self.timer.*, self.calendar.today)
         AlarmManager::GetInstance().Start(false);
+        // Thời tiết (Open-Meteo) + tin tức (RSS VnExpress): self.weather.get, self.news.get
+        InfoServices::GetInstance().RegisterTools();
+#if DISPLAY_HEIGHT == 64
+        // Màn hình chờ: giờ to, ngày, âm lịch, thời tiết
+        IdleScreen::GetInstance().Start(display_);
+#endif
     }
 
 public:

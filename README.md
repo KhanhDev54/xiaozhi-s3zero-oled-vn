@@ -18,9 +18,10 @@ Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 
 5. [Trò chuyện](#5-trò-chuyện)
 6. [Nút bấm & đèn](#6-nút-bấm--đèn)
 7. [Báo thức, hẹn giờ, âm lịch](#7-báo-thức-hẹn-giờ-âm-lịch)
-8. [Xử lý sự cố](#8-xử-lý-sự-cố)
-9. [Dành cho người phát triển](#9-dành-cho-người-phát-triển)
-10. [Nguồn gốc & giấy phép](#10-nguồn-gốc--giấy-phép)
+8. [Màn hình chờ, thời tiết, tin tức](#8-màn-hình-chờ-thời-tiết-tin-tức)
+9. [Xử lý sự cố](#9-xử-lý-sự-cố)
+10. [Dành cho người phát triển](#10-dành-cho-người-phát-triển)
+11. [Nguồn gốc & giấy phép](#11-nguồn-gốc--giấy-phép)
 
 ---
 
@@ -33,7 +34,10 @@ Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 
 | 👂 Từ đánh thức **"Sophia"** | Nhận dạng offline trên chip |
 | 🖥️ OLED 0.96" 128x64 | Trạng thái, cảm xúc, nội dung trò chuyện |
 | ⏰ Báo thức, hẹn giờ | Ra lệnh bằng giọng, lưu khi tắt nguồn |
-| 📅 Âm lịch | Hỏi "hôm nay âm lịch ngày mấy", can chi, giờ hoàng đạo |
+| 📅 Âm lịch | Hiện trên màn chờ; hỏi "hôm nay âm lịch ngày mấy", can chi, giờ hoàng đạo |
+| 🕒 Màn hình chờ | Giờ to, thứ/ngày, âm lịch, nhiệt độ, AQI |
+| 🌤️ Thời tiết | Open-Meteo (không cần key): hiện tại + 3 ngày tới, chất lượng không khí |
+| 📰 Tin tức | Đọc tin mới nhất, thể thao, thế giới… từ RSS VnExpress |
 | 💡 Đèn GPIO12 | Bật/tắt bằng giọng nói |
 
 ## 2. Phần cứng & sơ đồ chân
@@ -114,7 +118,38 @@ Tải file về tự nạp: tab **Actions** → lần chạy mới nhất ✓ �
 - Lưu tối đa 8 báo thức trong bộ nhớ mạch, **không mất khi tắt nguồn**.
 - Cần mạch đã có giờ chuẩn (đã kết nối mạng sau khi bật).
 
-## 8. Xử lý sự cố
+## 8. Màn hình chờ, thời tiết, tin tức
+
+### Màn hình chờ (OLED 0.96")
+
+Khi rảnh khoảng 5 giây, OLED chuyển sang màn hình chờ:
+
+```
+      09:18
+ T5 05/11 · 26/9 ÂL      <- đổi qua lại mỗi 5 giây
+ 23° Mưa rào · AQI 96
+```
+
+- Ẩn ngay khi trò chuyện, khi báo thức kêu, hoặc 4 giây sau khi bấm nút (để thấy thông báo âm lượng).
+- Cần mạch đã có giờ chuẩn (đã kết nối mạng).
+
+### Thời tiết
+
+Hỏi: *"Thời tiết hôm nay thế nào?"*, *"Ngày mai có mưa không?"*, *"Không khí hôm nay có tốt không?"*.
+
+- Dữ liệu thật từ [Open-Meteo](https://open-meteo.com) (miễn phí, không cần key), dự báo 3 ngày tới, AQI.
+- Vị trí tự xác định theo địa chỉ IP; cập nhật 30 phút/lần.
+
+### Tin tức
+
+Hỏi: *"Tin tức hôm nay có gì?"*, *"Có tin thể thao gì mới?"*, *"Đọc tin thế giới"*, *"Tin công nghệ"*.
+
+- Lấy từ RSS của **VnExpress**: tin mới nhất, thời sự, thế giới, kinh doanh, thể thao, giải trí,
+  khoa học công nghệ, sức khỏe, giáo dục, pháp luật (mặc định 5 tin).
+- Trợ lý chỉ đọc **tiêu đề + tóm tắt** có trong RSS; không có tỉ số trực tiếp hay bảng xếp hạng.
+- Dùng cho mục đích cá nhân.
+
+## 9. Xử lý sự cố
 
 | Hiện tượng | Cách xử lý |
 |---|---|
@@ -124,8 +159,10 @@ Tải file về tự nạp: tab **Actions** → lần chạy mới nhất ✓ �
 | Không nghe tiếng | MAX98357A: DIN=5, BCLK=6, LRC=7, VIN 5V |
 | Không nhận giọng | INMP441: L/R nối GND, WS=2, SCK=3, SD=4 |
 | Khởi động lại liên tục | Nạp lại với ô *Xoá toàn bộ flash* |
+| Màn chờ không hiện | Mạch cần có giờ chuẩn (kết nối mạng); chờ ~5 giây sau khi rảnh |
+| Không đọc được tin tức / thời tiết | Kiểm tra mạng ra Internet; thử lại sau ít phút |
 
-## 9. Dành cho người phát triển
+## 10. Dành cho người phát triển
 
 Mỗi lần push lên `main` (trừ khi chỉ sửa file `.md`), workflow
 [`build-zero-oled.yml`](.github/workflows/build-zero-oled.yml) build bản `esp32s3-zero-oled-096`
@@ -144,11 +181,14 @@ idf.py -p COM5 flash monitor
 | `main/boards/esp32s3-zero-oled/config.json` | Bản build (0.91" / 0.96" / 1.3" SH1106), flash 4MB |
 | `main/boards/esp32s3-zero-oled/alarm_manager.*` | Báo thức, hẹn giờ, lệnh âm lịch |
 | `main/boards/esp32s3-zero-oled/lunar_calendar.*` | Âm lịch Việt Nam |
+| `main/boards/esp32s3-zero-oled/idle_screen.*` | Màn hình chờ OLED |
+| `main/boards/esp32s3-zero-oled/info_services.*` | Thời tiết Open-Meteo, tin tức RSS |
+| `main/boards/esp32s3-zero-oled/rss_parser.*` | Đọc RSS (kiểm thử được trên máy tính) |
 | `web/` | Trang nạp (dùng chung với repo mạch 2.8") |
 
 Đổi từ đánh thức: sửa `--wake-word` trong workflow, ví dụ `wn9_alexa`, `wn9_jarvis_tts`, `wn9_hiesp`.
 
-## 10. Nguồn gốc & giấy phép
+## 11. Nguồn gốc & giấy phép
 
 - Dựa trên [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) (commit `a73e9a7`, v2.5.3).
   README gốc: [README_upstream.md](README_upstream.md).
