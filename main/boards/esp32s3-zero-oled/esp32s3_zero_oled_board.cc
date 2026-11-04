@@ -10,6 +10,7 @@
 #include "alarm_manager.h"
 #include "idle_screen.h"
 #include "info_services.h"
+#include "radio_player.h"
 #include "led/single_led.h"
 #include "assets/lang_config.h"
 
@@ -155,6 +156,8 @@ private:
         AlarmManager::GetInstance().Start(false);
         // Thời tiết (Open-Meteo) + tin tức (RSS VnExpress): self.weather.get, self.news.get
         InfoServices::GetInstance().RegisterTools();
+        // Radio VOV: self.radio.play / stop / list
+        RadioPlayer::GetInstance().RegisterTools();
 #if DISPLAY_HEIGHT == 64
         // Màn hình chờ: giờ to, ngày, âm lịch, thời tiết
         IdleScreen::GetInstance().Start(display_);
