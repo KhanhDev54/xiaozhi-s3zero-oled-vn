@@ -14,6 +14,7 @@
 #include "display.h"
 #include "info_services.h"
 #include "lunar_calendar.h"
+#include "radio_player.h"
 
 #define TAG "IdleScreen"
 
@@ -124,7 +125,10 @@ void IdleScreen::Tick() {
     std::string text;
     WeatherNow w = InfoServices::GetInstance().GetWeather();
     bool show_weather = w.valid && ((tick_ / kLineRotateSeconds) % 2 == 1);
-    if (show_weather) {
+    auto& radio = RadioPlayer::GetInstance();
+    if (radio.IsPlaying() && (tick_ / kLineRotateSeconds) % 2 == 0) {
+        text = "Radio: " + radio.CurrentName();
+    } else if (show_weather) {
         text = std::to_string(w.temp) + "° " + w.desc;
         if (w.aqi >= 0) text += " · AQI " + std::to_string(w.aqi);
     } else {

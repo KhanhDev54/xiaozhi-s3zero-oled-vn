@@ -38,6 +38,7 @@ Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 
 | 🕒 Màn hình chờ | Giờ to, thứ/ngày, âm lịch, nhiệt độ, AQI |
 | 🌤️ Thời tiết | Open-Meteo (không cần key): hiện tại + 3 ngày tới, chất lượng không khí |
 | 📰 Tin tức | Đọc tin mới nhất, thể thao, thế giới… từ RSS VnExpress |
+| 📻 Radio VOV | VOV1, VOV2, VOV3, VOV5, VOV Giao thông HN/HCM, VOV Mekong |
 | 💡 Đèn GPIO12 | Bật/tắt bằng giọng nói |
 
 ## 2. Phần cứng & sơ đồ chân
@@ -149,6 +150,16 @@ Hỏi: *"Tin tức hôm nay có gì?"*, *"Có tin thể thao gì mới?"*, *"Đ�
 - Trợ lý chỉ đọc **tiêu đề + tóm tắt** có trong RSS; không có tỉ số trực tiếp hay bảng xếp hạng.
 - Dùng cho mục đích cá nhân.
 
+### Radio VOV
+
+Nói: *"Mở radio VOV1"*, *"Nghe VOV giao thông Hà Nội"*, *"Mở đài âm nhạc"*, *"Tắt radio"*.
+
+- Kênh: VOV1 (thời sự), VOV2 (văn hoá), VOV3 (âm nhạc), VOV5, VOV Giao thông Hà Nội / TP.HCM, VOV Mekong.
+- Radio **bắt đầu phát sau khi cuộc trò chuyện kết thúc**, và **tự dừng khi bạn gọi "Sophia"**
+  hoặc bấm nút đánh thức — muốn nghe tiếp thì bảo mở lại.
+- Nút tăng/giảm âm lượng dùng được khi đang nghe radio; màn chờ hiện tên kênh.
+- Luồng phát trực tiếp từ `stream.vovmedia.vn` (AAC). Cần mạng ổn định.
+
 ## 9. Xử lý sự cố
 
 | Hiện tượng | Cách xử lý |
@@ -161,6 +172,7 @@ Hỏi: *"Tin tức hôm nay có gì?"*, *"Có tin thể thao gì mới?"*, *"Đ�
 | Khởi động lại liên tục | Nạp lại với ô *Xoá toàn bộ flash* |
 | Màn chờ không hiện | Mạch cần có giờ chuẩn (kết nối mạng); chờ ~5 giây sau khi rảnh |
 | Không đọc được tin tức / thời tiết | Kiểm tra mạng ra Internet; thử lại sau ít phút |
+| Radio không phát / bị ngắt | Chờ cuộc trò chuyện kết thúc; kiểm tra mạng; thử kênh khác |
 
 ## 10. Dành cho người phát triển
 
@@ -184,6 +196,8 @@ idf.py -p COM5 flash monitor
 | `main/boards/esp32s3-zero-oled/idle_screen.*` | Màn hình chờ OLED |
 | `main/boards/esp32s3-zero-oled/info_services.*` | Thời tiết Open-Meteo, tin tức RSS |
 | `main/boards/esp32s3-zero-oled/rss_parser.*` | Đọc RSS (kiểm thử được trên máy tính) |
+| `main/boards/esp32s3-zero-oled/radio_player.*` | Radio VOV (giải mã AAC, đổi tần số mẫu) |
+| `main/audio/audio_service.*` | Thêm `KeepOutputAlive()` để radio giữ loa bật |
 | `web/` | Trang nạp (dùng chung với repo mạch 2.8") |
 
 Đổi từ đánh thức: sửa `--wake-word` trong workflow, ví dụ `wn9_alexa`, `wn9_jarvis_tts`, `wn9_hiesp`.
