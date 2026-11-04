@@ -19,6 +19,12 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <esp_app_desc.h>
+
+// Name shown on screen at boot and after activation ("KenDev v2.5.3").
+#ifndef DEVICE_BRAND_NAME
+#define DEVICE_BRAND_NAME "KenDev"
+#endif
 
 #define TAG "Application"
 
@@ -71,7 +77,11 @@ void Application::Initialize() {
     auto display = board.GetDisplay();
     display->SetupUI();
     // Print board name/version info
-    display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
+    {
+        // Boot signature (personal build)
+        std::string signature = std::string(DEVICE_BRAND_NAME) + " · v" + esp_app_get_description()->version;
+        display->SetChatMessage("system", signature.c_str());
+    }
 
     // Setup the audio service
     auto codec = board.GetAudioCodec();
