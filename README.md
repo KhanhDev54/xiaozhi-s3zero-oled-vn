@@ -87,6 +87,19 @@ Tải file về tự nạp: tab **Actions** → lần chạy mới nhất ✓ �
 
 Đổi Wi-Fi sau này: bấm nút đánh thức (GPIO1) **lúc mạch đang khởi động** để vào lại chế độ cài mạng.
 
+### Trang cài đặt (192.168.4.1)
+
+Trang cài đặt có 3 thẻ, giao diện tiếng Việt:
+
+| Thẻ | Nội dung |
+|---|---|
+| **Wi-Fi** | Danh sách mạng xung quanh (có vạch sóng), Wi-Fi đã lưu (đặt ưu tiên / xóa), nhập mật khẩu |
+| **Tùy chỉnh** | Thành phố cho thời tiết (để trống = tự đoán theo IP), âm lượng khi khởi động, giờ tự giảm sáng màn hình ban đêm |
+| **Nâng cao** | Địa chỉ OTA, công suất phát Wi-Fi, ghi nhớ BSSID |
+
+Mẹo: vào thẻ **Tùy chỉnh** và bấm **Lưu** *trước* khi bấm **Kết nối** ở thẻ Wi-Fi, vì sau khi kết nối
+thành công mạch sẽ tắt trang cài đặt. Tùy chỉnh có hiệu lực từ lần khởi động sau.
+
 > Giao diện xiaozhi.me có thể đổi theo thời gian; tên các mục chỉ mang tính tham khảo.
 
 ## 5. Trò chuyện
