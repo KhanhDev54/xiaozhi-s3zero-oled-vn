@@ -31,7 +31,7 @@ Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 
 |---|---|
 | 🗣️ Trò chuyện AI bằng giọng nói | Qua server xiaozhi.me, trả lời tiếng Việt |
 | 🇻🇳 Giao diện & âm báo tiếng Việt | Ngôn ngữ firmware `vi-VN` |
-| 👂 Từ đánh thức **"Jarvis"** | Nhận dạng offline trên chip (nói "Jarvis" hoặc "Hi Jarvis") |
+| 👂 Từ đánh thức **"Sophia"** | Nhận dạng offline trên chip (nói "Sophia" hoặc "Hi Sophia") |
 | 🖥️ OLED 0.96" 128x64 | Trạng thái, **mặt "mochi" động** (chớp mắt, nhún, liếc khi nghe, mấp máy miệng khi nói, đổi biểu cảm theo cảm xúc), nội dung trò chuyện |
 | ⏰ Báo thức, hẹn giờ | Ra lệnh bằng giọng, lưu khi tắt nguồn |
 | 📅 Âm lịch | Hiện trên màn chờ; hỏi "hôm nay âm lịch ngày mấy", can chi, giờ hoàng đạo |
@@ -104,7 +104,7 @@ thành công mạch sẽ tắt trang cài đặt. Tùy chỉnh có hiệu lực 
 
 ## 5. Trò chuyện
 
-- Nói **"Jarvis"** (đọc *"Gia-vịt"*, nói "Hi Jarvis" cũng được), hoặc bấm **nút đánh thức** (GPIO1).
+- Nói **"Sophia"** (nói "Hi Sophia" cũng được), hoặc bấm **nút đánh thức** (GPIO1).
 - Sau khi đánh thức, nói chuyện **bằng tiếng Việt** bình thường.
 - Đang nói / đang nghe: bấm nút đánh thức để ngắt / kết thúc.
 
@@ -183,7 +183,7 @@ Hỏi: *"Tin tức hôm nay có gì?"*, *"Có tin thể thao gì mới?"*, *"Đ�
 Nói: *"Mở radio VOV1"*, *"Nghe VOV giao thông Hà Nội"*, *"Mở đài âm nhạc"*, *"Tắt radio"*.
 
 - Kênh: VOV1 (thời sự), VOV2 (văn hoá), VOV3 (âm nhạc), VOV5, VOV Giao thông Hà Nội / TP.HCM, VOV Mekong.
-- Radio **bắt đầu phát sau khi cuộc trò chuyện kết thúc**, và **tự dừng khi bạn gọi "Jarvis"**
+- Radio **bắt đầu phát sau khi cuộc trò chuyện kết thúc**, và **tự dừng khi bạn gọi "Sophia"**
   hoặc bấm nút đánh thức — muốn nghe tiếp thì bảo mở lại.
 - Nút tăng/giảm âm lượng dùng được khi đang nghe radio; màn chờ hiện tên kênh.
 - Luồng phát trực tiếp từ `stream.vovmedia.vn` (AAC). Cần mạng ổn định.
