@@ -32,7 +32,7 @@ Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 
 | 🗣️ Trò chuyện AI bằng giọng nói | Qua server xiaozhi.me, trả lời tiếng Việt |
 | 🇻🇳 Giao diện & âm báo tiếng Việt | Ngôn ngữ firmware `vi-VN` |
 | 👂 Từ đánh thức **"Jarvis"** | Nhận dạng offline trên chip (nói "Jarvis" hoặc "Hi Jarvis") |
-| 🖥️ OLED 0.96" 128x64 | Trạng thái, cảm xúc, nội dung trò chuyện |
+| 🖥️ OLED 0.96" 128x64 | Trạng thái, **mặt "mochi" động** (chớp mắt, nhún, liếc khi nghe, mấp máy miệng khi nói, đổi biểu cảm theo cảm xúc), nội dung trò chuyện |
 | ⏰ Báo thức, hẹn giờ | Ra lệnh bằng giọng, lưu khi tắt nguồn |
 | 📅 Âm lịch | Hiện trên màn chờ; hỏi "hôm nay âm lịch ngày mấy", can chi, giờ hoàng đạo |
 | 🕒 Màn hình chờ | Giờ to, biểu tượng thời tiết, thứ/ngày, âm lịch, nhiệt độ, AQI, "còn x ngày tới Rằm/mùng 1"; tự giảm sáng 22h–6h |
