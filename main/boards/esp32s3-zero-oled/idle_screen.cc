@@ -207,7 +207,7 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
     }
 }
 
-// SSD1306 contrast: low during the night window (default 22:00-06:00)
+// SSD1306 contrast: moderate by day, very low during the night window (default 22:00-06:00)
 void IdleScreen::UpdateContrast(int hour) {
     if (panel_io_ == nullptr) return;
     bool night = false;
@@ -215,7 +215,8 @@ void IdleScreen::UpdateContrast(int hour) {
         night = night_start_ <= night_end_ ? (hour >= night_start_ && hour < night_end_)
                                            : (hour >= night_start_ || hour < night_end_);
     }
-    int want = night ? 0x08 : 0xCF;
+    // Moderate brightness by day (saves power, OLED lasts longer), very dim at night
+    int want = night ? 0x04 : 0x30;
     if (want == contrast_) return;
     uint8_t v = (uint8_t)want;
     if (esp_lcd_panel_io_tx_param(panel_io_, 0x81, &v, 1) == ESP_OK) {
