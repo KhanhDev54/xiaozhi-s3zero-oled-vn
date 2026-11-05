@@ -10,7 +10,8 @@
                 "CONFIG_SPIRAM_MODE_QUAD=y",
                 "CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y",
                 "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/4m.csv\"",
-                "CONFIG_LV_FONT_MONTSERRAT_32=y"
+                "CONFIG_LV_FONT_MONTSERRAT_32=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=y"
             ]
         },
         {
@@ -21,7 +22,8 @@
                 "CONFIG_SPIRAM_MODE_QUAD=y",
                 "CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y",
                 "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/4m.csv\"",
-                "CONFIG_LV_FONT_MONTSERRAT_32=y"
+                "CONFIG_LV_FONT_MONTSERRAT_32=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=y"
             ]
         },
         {
@@ -32,7 +34,8 @@
                 "CONFIG_SPIRAM_MODE_QUAD=y",
                 "CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y",
                 "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/4m.csv\"",
-                "CONFIG_LV_FONT_MONTSERRAT_32=y"
+                "CONFIG_LV_FONT_MONTSERRAT_32=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=y"
             ]
         }
     ]

@@ -4,11 +4,14 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <esp_timer.h>
 #include <algorithm>
 #include <cstring>
 #include <vector>
 
 #include "esp_aac_dec.h"
+#include <http.h>
+#include <memory>
 
 #include "application.h"
 #include "board.h"
@@ -143,15 +146,33 @@ void RadioPlayer::Run() {
         return;
     }
 
-    auto http = network->CreateHttp(1);
-    http->SetHeader("Icy-MetaData", "0");
-    http->SetHeader("User-Agent", "xiaozhi-s3zero-oled-vn");
+    std::unique_ptr<Http> http;
     bool ok = false;
-    if (auto opened = http->Open("GET", url); !opened) {
-        ESP_LOGE(TAG, "Open failed: %s", opened.error().ToString().c_str());
-    } else if (auto status = http->GetStatusCode(); !status || *status != 200) {
-        ESP_LOGE(TAG, "Bad HTTP status");
-    } else {
+    for (int hop = 0; hop < 4 && !ok; hop++) {
+        http = network->CreateHttp(1);
+        http->SetHeader("Icy-MetaData", "0");
+        http->SetHeader("User-Agent", "Mozilla/5.0 (xiaozhi-s3zero-oled-vn)");
+        if (auto opened = http->Open("GET", url); !opened) {
+            ESP_LOGE(TAG, "Open failed: %s", opened.error().ToString().c_str());
+            break;
+        }
+        auto status = http->GetStatusCode();
+        int code = status ? *status : -1;
+        std::string ctype = http->GetResponseHeader("Content-Type");
+        ESP_LOGI(TAG, "HTTP %d, Content-Type: %s", code, ctype.c_str());
+        if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+            std::string loc = http->GetResponseHeader("Location");
+            if (loc.empty()) loc = http->GetResponseHeader("location");
+            http->Close();
+            if (loc.empty()) break;
+            ESP_LOGI(TAG, "Redirect -> %s", loc.c_str());
+            url = loc;
+            continue;
+        }
+        if (code != 200) {
+            ESP_LOGE(TAG, "Bad HTTP status %d", code);
+            break;
+        }
         ok = true;
     }
 
@@ -171,6 +192,12 @@ void RadioPlayer::Run() {
     double resample_pos = 0;  // fractional read position carried across frames
     int16_t last_sample = 0;
     int errors = 0;
+    // Diagnostics (one line every ~5 s in the device log)
+    size_t total_bytes = 0;
+    int frames_found = 0, frames_ok = 0;
+    int last_rate = 0, last_ch = 0;
+    int64_t last_report = esp_timer_get_time();
+    bool dumped_head = false;
 
     while (ok && !stop_requested_) {
         // The assistant needs the speaker/mic: stop the radio
@@ -190,6 +217,19 @@ void RadioPlayer::Run() {
             break;
         }
         acc.insert(acc.end(), in.begin(), in.begin() + *n);
+        total_bytes += *n;
+        if (!dumped_head && acc.size() >= 16) {
+            dumped_head = true;
+            ESP_LOGI(TAG, "Stream head: %02X %02X %02X %02X %02X %02X %02X %02X | %.8s",
+                     acc[0], acc[1], acc[2], acc[3], acc[4], acc[5], acc[6], acc[7],
+                     reinterpret_cast<const char*>(acc.data()));
+        }
+        if (esp_timer_get_time() - last_report > 5000000) {
+            last_report = esp_timer_get_time();
+            ESP_LOGI(TAG, "diag: %u KB read, ADTS frames %d, decoded %d, errors %d, %d Hz x%d -> %d Hz",
+                     (unsigned)(total_bytes / 1024), frames_found, frames_ok, errors, last_rate, last_ch,
+                     out_rate);
+        }
 
         size_t pos = 0;
         while (pos + 7 <= acc.size()) {
@@ -199,6 +239,7 @@ void RadioPlayer::Run() {
                 continue;
             }
             if (pos + flen > acc.size()) break;  // need more data
+            frames_found++;
 
             esp_audio_dec_in_raw_t raw = {};
             raw.buffer = &acc[pos];
@@ -214,7 +255,13 @@ void RadioPlayer::Run() {
             }
             pos += flen;
             if (ret != ESP_AUDIO_ERR_OK || frame.decoded_size == 0 || info.sample_rate == 0) {
-                if (++errors > 50) {
+                if (errors < 5) {
+                    ESP_LOGW(TAG, "Decode issue: ret=%d decoded=%u rate=%d ch=%d", (int)ret,
+                             (unsigned)frame.decoded_size, (int)info.sample_rate, (int)info.channel);
+                }
+                // HE-AAC may need a few frames before producing audio: only give up when
+                // nothing at all has been decoded
+                if (++errors > 200 && frames_ok == 0) {
                     ESP_LOGE(TAG, "Too many decode errors");
                     stop_requested_ = true;
                     break;
@@ -222,6 +269,13 @@ void RadioPlayer::Run() {
                 continue;
             }
 
+            frames_ok++;
+            last_rate = info.sample_rate;
+            last_ch = info.channel;
+            if (frames_ok == 1) {
+                ESP_LOGI(TAG, "First audio: %d Hz, %d ch, %u bytes/frame", (int)info.sample_rate,
+                         (int)info.channel, (unsigned)frame.decoded_size);
+            }
             // Downmix to mono and resample (linear) to the codec output rate
             const int16_t* s = reinterpret_cast<const int16_t*>(pcm.data());
             int ch = info.channel > 0 ? info.channel : 1;
@@ -258,9 +312,9 @@ void RadioPlayer::Run() {
         if (acc.size() > 64 * 1024) acc.clear();  // garbage, start over
     }
 
-    http->Close();
+    if (http) http->Close();
     esp_aac_dec_close(dec);
-    ESP_LOGI(TAG, "Radio stopped");
+    ESP_LOGI(TAG, "Radio stopped (%u KB, %d frames decoded)", (unsigned)(total_bytes / 1024), frames_ok);
 }
 
 void RadioPlayer::RegisterTools() {

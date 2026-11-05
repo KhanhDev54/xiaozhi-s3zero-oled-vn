@@ -35,10 +35,12 @@ Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 
 | 🖥️ OLED 0.96" 128x64 | Trạng thái, cảm xúc, nội dung trò chuyện |
 | ⏰ Báo thức, hẹn giờ | Ra lệnh bằng giọng, lưu khi tắt nguồn |
 | 📅 Âm lịch | Hiện trên màn chờ; hỏi "hôm nay âm lịch ngày mấy", can chi, giờ hoàng đạo |
-| 🕒 Màn hình chờ | Giờ to, thứ/ngày, âm lịch, nhiệt độ, AQI |
+| 🕒 Màn hình chờ | Giờ to, biểu tượng thời tiết, thứ/ngày, âm lịch, nhiệt độ, AQI, "còn x ngày tới Rằm/mùng 1"; tự giảm sáng 22h–6h |
 | 🌤️ Thời tiết | Open-Meteo (không cần key): hiện tại + 3 ngày tới, chất lượng không khí |
 | 📰 Tin tức | Đọc tin mới nhất, thể thao, thế giới… từ RSS VnExpress |
 | 📻 Radio VOV | VOV1, VOV2, VOV3, VOV5, VOV Giao thông HN/HCM, VOV Mekong |
+| 🪙 Giá vàng SJC | Lấy từ website SJC (sjc.com.vn), đồng/lượng |
+| 💱 Tỷ giá Vietcombank | USD, EUR, JPY, KRW, CNY… mua tiền mặt / chuyển khoản / bán |
 | 💡 Đèn GPIO12 | Bật/tắt bằng giọng nói |
 
 ## 2. Phần cứng & sơ đồ chân
@@ -126,11 +128,13 @@ Tải file về tự nạp: tab **Actions** → lần chạy mới nhất ✓ �
 Khi rảnh khoảng 5 giây, OLED chuyển sang màn hình chờ:
 
 ```
-      09:18
- T5 05/11 · 26/9 ÂL      <- đổi qua lại mỗi 5 giây
- 23° Mưa rào · AQI 96
+ 09:18          ☁        <- biểu tượng thời tiết vẽ bằng nét (nắng, trăng, mây, mưa, giông, sương mù)
+ T5 05/11 · 26/9 ÂL      <- dòng dưới đổi mỗi 5 giây:
+ 23° Mưa rào · AQI 96       ngày + âm lịch -> thời tiết -> đếm ngày tới Rằm / mùng 1
+ Còn 4 ngày tới mùng 1      (đang nghe radio thì có thêm tên kênh)
 ```
 
+- Từ **22 giờ đến 6 giờ sáng** OLED tự giảm độ sáng.
 - Ẩn ngay khi trò chuyện, khi báo thức kêu, hoặc 4 giây sau khi bấm nút (để thấy thông báo âm lượng).
 - Cần mạch đã có giờ chuẩn (đã kết nối mạng).
 
@@ -140,6 +144,17 @@ Hỏi: *"Thời tiết hôm nay thế nào?"*, *"Ngày mai có mưa không?"*, *
 
 - Dữ liệu thật từ [Open-Meteo](https://open-meteo.com) (miễn phí, không cần key), dự báo 3 ngày tới, AQI.
 - Vị trí tự xác định theo địa chỉ IP; cập nhật 30 phút/lần.
+
+### Giá vàng & tỷ giá
+
+Hỏi: *"Giá vàng hôm nay bao nhiêu?"*, *"Giá vàng SJC ở Hà Nội"*, *"Tỷ giá đô hôm nay"*, *"Tỷ giá euro"*.
+
+- **Giá vàng**: lấy từ website của **Công ty Vàng bạc Đá quý Sài Gòn (SJC)**, đơn vị đồng/lượng,
+  mặc định khu vực Hồ Chí Minh.
+- **Tỷ giá**: lấy từ bảng tỷ giá công khai của **Vietcombank** (mua tiền mặt, mua chuyển khoản, bán).
+- Đây là dữ liệu trên website của SJC và Vietcombank, **không phải API chính thức có tài liệu**;
+  nếu họ đổi website thì tính năng có thể ngừng chạy cho tới khi firmware được cập nhật.
+- Chỉ để tham khảo, không dùng thay cho bảng giá tại quầy.
 
 ### Tin tức
 
@@ -173,6 +188,7 @@ Nói: *"Mở radio VOV1"*, *"Nghe VOV giao thông Hà Nội"*, *"Mở đài âm 
 | Màn chờ không hiện | Mạch cần có giờ chuẩn (kết nối mạng); chờ ~5 giây sau khi rảnh |
 | Không đọc được tin tức / thời tiết | Kiểm tra mạng ra Internet; thử lại sau ít phút |
 | Radio không phát / bị ngắt | Chờ cuộc trò chuyện kết thúc; kiểm tra mạng; thử kênh khác |
+| Cần gửi log cho người hỗ trợ | Trang nạp → mục **3. Xem log của mạch** → *Mở log* → thao tác lỗi → *Tải file .txt* |
 
 ## 10. Dành cho người phát triển
 
