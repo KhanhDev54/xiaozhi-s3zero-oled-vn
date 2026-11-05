@@ -31,7 +31,7 @@ Dựa trên bản gốc [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) 
 |---|---|
 | 🗣️ Trò chuyện AI bằng giọng nói | Qua server xiaozhi.me, trả lời tiếng Việt |
 | 🇻🇳 Giao diện & âm báo tiếng Việt | Ngôn ngữ firmware `vi-VN` |
-| 👂 Từ đánh thức **"Sophia"** | Nhận dạng offline trên chip |
+| 👂 Từ đánh thức **"Jarvis"** | Nhận dạng offline trên chip (nói "Jarvis" hoặc "Hi Jarvis") |
 | 🖥️ OLED 0.96" 128x64 | Trạng thái, cảm xúc, nội dung trò chuyện |
 | ⏰ Báo thức, hẹn giờ | Ra lệnh bằng giọng, lưu khi tắt nguồn |
 | 📅 Âm lịch | Hiện trên màn chờ; hỏi "hôm nay âm lịch ngày mấy", can chi, giờ hoàng đạo |
@@ -80,12 +80,12 @@ Tải file về tự nạp: tab **Actions** → lần chạy mới nhất ✓ �
 
 ## 4. Cài Wi-Fi & kích hoạt
 
-1. Lần đầu, màn hình hiện tên Wi-Fi mạch phát ra (bắt đầu bằng `Xiaozhi`) và địa chỉ cài đặt.
+1. Lần đầu, màn hình hiện tên Wi-Fi mạch phát ra (bắt đầu bằng `KenDev`) và địa chỉ cài đặt.
 2. Điện thoại kết nối Wi-Fi đó → chọn Wi-Fi nhà (**2.4GHz**) → nhập mật khẩu.
 3. Mạch đọc **mã kích hoạt 6 số** → vào **https://xiaozhi.me** → Console → thêm thiết bị → nhập mã.
 4. Trong cấu hình Agent trên xiaozhi.me, chọn ngôn ngữ / giọng đọc tiếng Việt.
 
-Đổi Wi-Fi sau này: bấm nút đánh thức (GPIO1) **lúc mạch đang khởi động** để vào lại chế độ cài mạng.
+Đổi Wi-Fi sau này: **bấm nhanh 3 lần** nút đánh thức (GPIO1) bất cứ lúc nào, hoặc bấm 1 lần lúc mạch đang khởi động. Mạch phát Wi-Fi **`KenDev-xxxx`**, vào `192.168.4.1` để cài.
 
 ### Trang cài đặt (192.168.4.1)
 
@@ -104,7 +104,7 @@ thành công mạch sẽ tắt trang cài đặt. Tùy chỉnh có hiệu lực 
 
 ## 5. Trò chuyện
 
-- Nói **"Sophia"** (đọc *"Sô-phia"*), hoặc bấm **nút đánh thức** (GPIO1).
+- Nói **"Jarvis"** (đọc *"Gia-vịt"*, nói "Hi Jarvis" cũng được), hoặc bấm **nút đánh thức** (GPIO1).
 - Sau khi đánh thức, nói chuyện **bằng tiếng Việt** bình thường.
 - Đang nói / đang nghe: bấm nút đánh thức để ngắt / kết thúc.
 
@@ -147,7 +147,7 @@ Khi rảnh khoảng 5 giây, OLED chuyển sang màn hình chờ:
  Còn 4 ngày tới mùng 1      (đang nghe radio thì có thêm tên kênh)
 ```
 
-- Từ **22 giờ đến 6 giờ sáng** OLED tự giảm độ sáng.
+- Ban ngày OLED để độ sáng vừa phải (đỡ tốn điện); từ **22 giờ đến 6 giờ sáng** giảm sáng hẳn (đổi giờ trong trang cài đặt).
 - Ẩn ngay khi trò chuyện, khi báo thức kêu, hoặc 4 giây sau khi bấm nút (để thấy thông báo âm lượng).
 - Cần mạch đã có giờ chuẩn (đã kết nối mạng).
 
@@ -183,7 +183,7 @@ Hỏi: *"Tin tức hôm nay có gì?"*, *"Có tin thể thao gì mới?"*, *"Đ�
 Nói: *"Mở radio VOV1"*, *"Nghe VOV giao thông Hà Nội"*, *"Mở đài âm nhạc"*, *"Tắt radio"*.
 
 - Kênh: VOV1 (thời sự), VOV2 (văn hoá), VOV3 (âm nhạc), VOV5, VOV Giao thông Hà Nội / TP.HCM, VOV Mekong.
-- Radio **bắt đầu phát sau khi cuộc trò chuyện kết thúc**, và **tự dừng khi bạn gọi "Sophia"**
+- Radio **bắt đầu phát sau khi cuộc trò chuyện kết thúc**, và **tự dừng khi bạn gọi "Jarvis"**
   hoặc bấm nút đánh thức — muốn nghe tiếp thì bảo mở lại.
 - Nút tăng/giảm âm lượng dùng được khi đang nghe radio; màn chờ hiện tên kênh.
 - Luồng phát trực tiếp từ `stream.vovmedia.vn` (AAC). Cần mạng ổn định.

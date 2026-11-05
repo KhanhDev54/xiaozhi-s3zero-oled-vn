@@ -114,6 +114,12 @@ private:
             app.ToggleChatState();
         });
 
+        // Bấm nhanh 3 lần: vào chế độ cài Wi-Fi (AP "KenDev-xxxx", trang 192.168.4.1)
+        boot_button_.OnMultipleClick([this]() {
+            IdleScreen::GetInstance().Bump(10);
+            EnterWifiConfigMode();
+        }, 3);
+
         volume_up_button_.OnClick([this]() {
             IdleScreen::GetInstance().Bump();
             auto codec = GetAudioCodec();

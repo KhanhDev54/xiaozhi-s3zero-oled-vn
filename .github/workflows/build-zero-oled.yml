@@ -36,7 +36,7 @@ jobs:
         run: |
           git config --global --add safe.directory '*'
           source $IDF_PATH/export.sh
-          python scripts/build.py "$BOARD" --name "$VARIANT" --language vi-VN --wake-word wn9_sophia_tts
+          python scripts/build.py "$BOARD" --name "$VARIANT" --language vi-VN --wake-word wn9_jarvis_tts
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
@@ -96,7 +96,7 @@ jobs:
                 "size": ${SIZE},
                 "flash_mb": 4,
                 "board": "ESP32-S3 Zero + OLED 0.96\" (4MB)",
-                "notes": "SSD1306 128x64 · INMP441 + MAX98357A · tiếng Việt · từ đánh thức Sophia · báo thức, hẹn giờ, âm lịch"
+                "notes": "SSD1306 128x64 · INMP441 + MAX98357A · tiếng Việt · từ đánh thức Jarvis · báo thức, hẹn giờ, âm lịch"
               }
             ]
           }
