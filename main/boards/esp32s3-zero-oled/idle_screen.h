@@ -50,6 +50,9 @@ private:
     lv_point_precise_t line_pts_[4][3] = {};
     int icon_kind_ = -2;
     int contrast_ = -1;
+    bool night_on_ = true;  // set on the Wi-Fi setup page ("Tùy chỉnh")
+    int night_start_ = 22;
+    int night_end_ = 6;
     bool visible_ = false;
     int idle_seconds_ = 0;
     int tick_ = 0;

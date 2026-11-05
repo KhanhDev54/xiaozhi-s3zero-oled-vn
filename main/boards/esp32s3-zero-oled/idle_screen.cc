@@ -16,6 +16,7 @@
 #include "info_services.h"
 #include "lunar_calendar.h"
 #include "radio_player.h"
+#include "settings.h"
 
 #define TAG "IdleScreen"
 
@@ -41,6 +42,10 @@ static int IconFor(int code, bool is_day) {
 void IdleScreen::Start(Display* display, esp_lcd_panel_io_handle_t panel_io) {
     display_ = display;
     panel_io_ = panel_io;
+    Settings s("idle", false);
+    night_on_ = s.GetInt("night_on", 1) != 0;
+    night_start_ = s.GetInt("night_start", 22);
+    night_end_ = s.GetInt("night_end", 6);
     xTaskCreate(TaskEntry, "idle_screen", 6144, this, 2, nullptr);
 }
 
@@ -202,10 +207,15 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
     }
 }
 
-// SSD1306 contrast: low between 22:00 and 06:00
+// SSD1306 contrast: low during the night window (default 22:00-06:00)
 void IdleScreen::UpdateContrast(int hour) {
     if (panel_io_ == nullptr) return;
-    int want = (hour >= 22 || hour < 6) ? 0x08 : 0xCF;
+    bool night = false;
+    if (night_on_) {
+        night = night_start_ <= night_end_ ? (hour >= night_start_ && hour < night_end_)
+                                           : (hour >= night_start_ || hour < night_end_);
+    }
+    int want = night ? 0x08 : 0xCF;
     if (want == contrast_) return;
     uint8_t v = (uint8_t)want;
     if (esp_lcd_panel_io_tx_param(panel_io_, 0x81, &v, 1) == ESP_OK) {
