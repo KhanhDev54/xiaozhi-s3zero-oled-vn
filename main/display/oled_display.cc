@@ -45,7 +45,10 @@ OledDisplay::OledDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handl
     ESP_LOGI(TAG, "Initialize LVGL");
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority = 1;
-    port_cfg.task_stack = 6144;
+    // KenDev: 6 KB is most likely not enough once the animated mochi face (lv_line + rounded shapes)
+    // is rendered: the LVGL task appears to overflow its stack and corrupt the lvgl_port tick
+    // mutex allocated just before it (boot loop: assert spinlock_acquire lock->count == 0).
+    port_cfg.task_stack = 10240;
 #if CONFIG_SOC_CPU_CORES_NUM > 1
     port_cfg.task_affinity = 1;
 #endif
