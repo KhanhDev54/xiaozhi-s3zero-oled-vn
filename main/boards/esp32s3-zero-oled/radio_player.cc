@@ -154,6 +154,13 @@ void RadioPlayer::Run() {
         http->SetHeader("User-Agent", "Mozilla/5.0 (xiaozhi-s3zero-oled-vn)");
         if (auto opened = http->Open("GET", url); !opened) {
             ESP_LOGE(TAG, "Open failed: %s", opened.error().ToString().c_str());
+            // stream.vovmedia.vn rejected the TLS handshake (fatal alert) on this
+            // firmware: the stream is public, so retry once over plain HTTP.
+            if (url.rfind("https://", 0) == 0) {
+                url = "http://" + url.substr(8);
+                ESP_LOGW(TAG, "Retrying without TLS: %s", url.c_str());
+                continue;
+            }
             break;
         }
         auto status = http->GetStatusCode();
