@@ -29,13 +29,13 @@ MochiFace::MochiFace(lv_obj_t* parent, int width, int height) : w_(width), h_(he
     lv_obj_set_size(body_, kBodyW, kBodyH);
     lv_obj_set_style_radius(body_, 12, 0);
     lv_obj_set_style_border_width(body_, 2, 0);
-    lv_obj_set_style_border_color(body_, lv_color_white(), 0);
+    lv_obj_set_style_border_color(body_, lv_color_black(), 0);
     lv_obj_clear_flag(body_, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
 
     auto dot = [this]() {
         lv_obj_t* o = lv_obj_create(body_);
         lv_obj_remove_style_all(o);
-        lv_obj_set_style_bg_color(o, lv_color_white(), 0);
+        lv_obj_set_style_bg_color(o, lv_color_black(), 0);
         lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
         lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
@@ -49,7 +49,7 @@ MochiFace::MochiFace(lv_obj_t* parent, int width, int height) : w_(width), h_(he
     for (auto& l : lines_) {
         l = lv_line_create(body_);
         lv_obj_set_style_line_width(l, 1, 0);
-        lv_obj_set_style_line_color(l, lv_color_white(), 0);
+        lv_obj_set_style_line_color(l, lv_color_black(), 0);
         lv_obj_add_flag(l, LV_OBJ_FLAG_HIDDEN);
     }
     timer_ = lv_timer_create(TimerCb, 120, this);
