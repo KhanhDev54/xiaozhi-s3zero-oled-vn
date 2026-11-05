@@ -1,4 +1,5 @@
 #include "oled_display.h"
+#include "mochi_face.h"
 #include "assets/lang_config.h"
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
@@ -286,6 +287,11 @@ void OledDisplay::SetupUI_128x64() {
     lv_obj_center(emotion_label_);
     lv_obj_set_style_pad_top(emotion_label_, 8, 0);
 
+    // KenDev: animated mochi face instead of the static emoji glyph
+    lv_obj_set_height(content_left_, height_ - 16);
+    lv_obj_add_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
+    mochi_ = new MochiFace(content_left_, 32, height_ - 16);
+
     content_right_ = lv_obj_create(content_);
     lv_obj_set_size(content_right_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_pad_all(content_right_, 0, 0);
@@ -419,6 +425,10 @@ bool OledDisplay::SetEmotion(const char* emotion) {
         emotion_font = lvgl_theme->large_icon_font()->font();
     }
     DisplayLockGuard lock(this);
+    if (mochi_ != nullptr) {
+        mochi_->SetEmotion(emotion);
+        return true;
+    }
     if (emotion_label_ == nullptr) {
         return false;
     }
