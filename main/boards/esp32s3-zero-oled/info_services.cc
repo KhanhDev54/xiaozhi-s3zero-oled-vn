@@ -1,4 +1,5 @@
 #include "info_services.h"
+#include <cctype>
 
 #include <cJSON.h>
 #include <esp_log.h>
@@ -9,6 +10,7 @@
 
 #include "mcp_server.h"
 #include "net_util.h"
+#include "finance_parse.h"
 #include "rss_parser.h"
 #include "settings.h"
 
@@ -133,7 +135,7 @@ bool InfoServices::RefreshWeather(int max_age_s) {
     char url[480];
     snprintf(url, sizeof(url),
              "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
-             "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"
+             "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,is_day"
              "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
              "&timezone=auto&forecast_days=4&wind_speed_unit=ms",
              lat_, lon_);
@@ -150,6 +152,8 @@ bool InfoServices::RefreshWeather(int max_age_s) {
     cJSON* cur = cJSON_GetObjectItem(root, "current");
     cJSON* t = cur ? cJSON_GetObjectItem(cur, "temperature_2m") : nullptr;
     cJSON* code = cur ? cJSON_GetObjectItem(cur, "weather_code") : nullptr;
+    cJSON* is_day = cur ? cJSON_GetObjectItem(cur, "is_day") : nullptr;
+    if (cJSON_IsNumber(is_day)) w.is_day = is_day->valueint != 0;
     if (cJSON_IsNumber(t) && cJSON_IsNumber(code)) {
         cJSON* h = cJSON_GetObjectItem(cur, "relative_humidity_2m");
         cJSON* fl = cJSON_GetObjectItem(cur, "apparent_temperature");
@@ -159,6 +163,7 @@ bool InfoServices::RefreshWeather(int max_age_s) {
         w.humidity = cJSON_IsNumber(h) ? h->valueint : 0;
         w.wind = cJSON_IsNumber(wi) ? (float)wi->valuedouble : 0;
         w.desc = WmoVi(code->valueint);
+        w.code = code->valueint;
         w.valid = true;
     }
     cJSON* daily = cJSON_GetObjectItem(root, "daily");
@@ -268,6 +273,117 @@ void InfoServices::RegisterTools() {
             }
             cJSON_AddItemToObject(o, "forecast", days);
             return o;
+        });
+
+    mcp.AddTool("self.finance.gold_price",
+        "Giá vàng SJC HÔM NAY lấy trực tiếp từ website Công ty Vàng bạc Đá quý Sài Gòn (sjc.com.vn).\n"
+        "Dùng khi người dùng hỏi giá vàng, vàng miếng SJC, vàng nhẫn. Đơn vị: đồng/lượng.\n"
+        "Đọc giá theo kiểu tự nhiên, ví dụ 148500000 -> 'một trăm bốn mươi tám triệu rưỡi'.\n"
+        "Chỉ đọc số liệu nhận được, KHÔNG tự đoán giá nếu tool lỗi. Nói rõ nguồn là SJC.\n"
+        "Args:\n"
+        "  branch: khu vực, mặc định 'Hồ Chí Minh' (có thể 'Hà Nội', 'Đà Nẵng'...)",
+        PropertyList({Property("branch", kPropertyTypeString, "Hồ Chí Minh")}),
+        [](const PropertyList& p) -> ReturnValue {
+            time_t now = time(nullptr);
+            struct tm t;
+            localtime_r(&now, &t);
+            char date[32];
+            snprintf(date, sizeof(date), "%02d/%02d/%04d", t.tm_mday, t.tm_mon + 1, t.tm_year + 1900);
+            std::string body, err;
+            std::string form = std::string("method=GetSJCGoldPriceByDate&toDate=") + zero::UrlEncode(date);
+            if (!zero::HttpPostForm("https://sjc.com.vn/GoldPrice/Services/PriceService.ashx", form,
+                                    "https://sjc.com.vn/", body, err)) {
+                ESP_LOGW(TAG, "SJC fetch failed: %s", err.c_str());
+                return "{\"success\": false, \"message\": \"Không lấy được giá vàng từ SJC\"}";
+            }
+            cJSON* root = cJSON_Parse(body.c_str());
+            body.clear();
+            body.shrink_to_fit();
+            cJSON* data = root ? cJSON_GetObjectItem(root, "data") : nullptr;
+            if (!cJSON_IsArray(data) || cJSON_GetArraySize(data) == 0) {
+                ESP_LOGW(TAG, "SJC: unexpected response");
+                if (root) cJSON_Delete(root);
+                return "{\"success\": false, \"message\": \"SJC chưa có dữ liệu giá hôm nay\"}";
+            }
+            std::string want = p["branch"].value<std::string>();
+            cJSON* items = cJSON_CreateArray();
+            for (int pass = 0; pass < 2 && cJSON_GetArraySize(items) == 0; pass++) {
+                cJSON* it;
+                cJSON_ArrayForEach(it, data) {
+                    if (cJSON_GetArraySize(items) >= 8) break;
+                    cJSON* type = cJSON_GetObjectItem(it, "TypeName");
+                    cJSON* branch = cJSON_GetObjectItem(it, "BranchName");
+                    cJSON* buy = cJSON_GetObjectItem(it, "BuyValue");
+                    cJSON* sell = cJSON_GetObjectItem(it, "SellValue");
+                    if (!cJSON_IsString(type) || !cJSON_IsNumber(buy) || !cJSON_IsNumber(sell)) continue;
+                    std::string b = cJSON_IsString(branch) ? branch->valuestring : "";
+                    // pass 0: only the requested branch; pass 1: anything
+                    if (pass == 0 && !want.empty() && b.find(want) == std::string::npos) continue;
+                    cJSON* o = cJSON_CreateObject();
+                    cJSON_AddStringToObject(o, "type", type->valuestring);
+                    cJSON_AddStringToObject(o, "branch", b.c_str());
+                    cJSON_AddNumberToObject(o, "buy_vnd_per_luong", buy->valuedouble);
+                    cJSON_AddNumberToObject(o, "sell_vnd_per_luong", sell->valuedouble);
+                    cJSON_AddItemToArray(items, o);
+                }
+            }
+            cJSON_Delete(root);
+            cJSON* out = cJSON_CreateObject();
+            cJSON_AddStringToObject(out, "source", "SJC (sjc.com.vn)");
+            cJSON_AddStringToObject(out, "date", date);
+            cJSON_AddItemToObject(out, "prices", items);
+            return out;
+        });
+
+    mcp.AddTool("self.finance.exchange_rate",
+        "Tỷ giá ngoại tệ HÔM NAY của ngân hàng Vietcombank (portal.vietcombank.com.vn).\n"
+        "Dùng khi người dùng hỏi tỷ giá đô la, giá USD, euro, yên Nhật, won, nhân dân tệ...\n"
+        "Trả về giá mua tiền mặt, mua chuyển khoản và giá bán (đồng). Nói rõ nguồn là Vietcombank.\n"
+        "KHÔNG tự đoán tỷ giá nếu tool lỗi.\n"
+        "Args:\n"
+        "  currency: mã tiền tệ: USD (mặc định), EUR, JPY, KRW, CNY, GBP, AUD, SGD, THB...\n"
+        "            hoặc ALL để lấy các loại phổ biến",
+        PropertyList({Property("currency", kPropertyTypeString, "USD")}),
+        [](const PropertyList& p) -> ReturnValue {
+            std::string body, err;
+            if (!zero::HttpGetText("https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx",
+                                   body, err)) {
+                ESP_LOGW(TAG, "VCB fetch failed: %s", err.c_str());
+                return "{\"success\": false, \"message\": \"Không lấy được tỷ giá từ Vietcombank\"}";
+            }
+            std::string when;
+            auto rates = zero::ParseVcbXml(body, &when);
+            body.clear();
+            body.shrink_to_fit();
+            std::string want = p["currency"].value<std::string>();
+            for (auto& c : want) c = (char)toupper((unsigned char)c);
+            static const char* kCommon[] = {"USD", "EUR", "JPY", "KRW", "CNY", "GBP", "AUD", "SGD"};
+            cJSON* items = cJSON_CreateArray();
+            for (const auto& r : rates) {
+                bool take = false;
+                if (want == "ALL" || want.empty()) {
+                    for (auto* c : kCommon) take |= (r.code == c);
+                } else {
+                    take = (r.code == want);
+                }
+                if (!take) continue;
+                cJSON* o = cJSON_CreateObject();
+                cJSON_AddStringToObject(o, "currency", r.code.c_str());
+                cJSON_AddStringToObject(o, "name", r.name.c_str());
+                if (r.buy_cash > 0) cJSON_AddNumberToObject(o, "buy_cash_vnd", r.buy_cash);
+                if (r.buy_transfer > 0) cJSON_AddNumberToObject(o, "buy_transfer_vnd", r.buy_transfer);
+                if (r.sell > 0) cJSON_AddNumberToObject(o, "sell_vnd", r.sell);
+                cJSON_AddItemToArray(items, o);
+            }
+            if (cJSON_GetArraySize(items) == 0) {
+                cJSON_Delete(items);
+                return "{\"success\": false, \"message\": \"Vietcombank không niêm yết loại tiền này\"}";
+            }
+            cJSON* out = cJSON_CreateObject();
+            cJSON_AddStringToObject(out, "source", "Vietcombank");
+            cJSON_AddStringToObject(out, "updated", when.c_str());
+            cJSON_AddItemToObject(out, "rates", items);
+            return out;
         });
 
     mcp.AddTool("self.news.get",

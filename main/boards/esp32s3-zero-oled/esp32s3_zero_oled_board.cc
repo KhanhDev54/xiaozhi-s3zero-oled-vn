@@ -160,7 +160,7 @@ private:
         RadioPlayer::GetInstance().RegisterTools();
 #if DISPLAY_HEIGHT == 64
         // Màn hình chờ: giờ to, ngày, âm lịch, thời tiết
-        IdleScreen::GetInstance().Start(display_);
+        IdleScreen::GetInstance().Start(display_, panel_io_);
 #endif
     }
 

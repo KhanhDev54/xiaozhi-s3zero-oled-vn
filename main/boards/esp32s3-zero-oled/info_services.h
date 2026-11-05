@@ -25,6 +25,8 @@ struct WeatherNow {
     int humidity = 0;
     float wind = 0;
     std::string desc;
+    int code = -1;      // WMO weather code (for the idle screen icon)
+    bool is_day = true;
     int aqi = -1;
     std::vector<WeatherDay> days;  // today + next days
 };
