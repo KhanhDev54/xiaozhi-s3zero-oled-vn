@@ -46,6 +46,7 @@ private:
     lv_obj_t* icon_ = nullptr;
     lv_obj_t* dots_[3] = {};   // circles
     lv_obj_t* block_ = nullptr;  // rectangle (cloud base)
+    lv_obj_t* inner_[3] = {};  // unlit copies inset by 2 px: turn the filled cloud into an outline
     lv_obj_t* lines_[4] = {};
     lv_point_precise_t line_pts_[4][3] = {};
     int icon_kind_ = -2;
