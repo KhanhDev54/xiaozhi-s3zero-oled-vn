@@ -115,6 +115,10 @@ void IdleScreen::Create() {
     lv_obj_clear_flag(icon_, LV_OBJ_FLAG_SCROLLABLE);
     for (auto& d : dots_) d = MakeShape(icon_, true);
     block_ = MakeShape(icon_, false);
+    for (int i = 0; i < 3; i++) {
+        inner_[i] = MakeShape(icon_, i < 2);
+        lv_obj_set_style_bg_color(inner_[i], lv_color_white(), 0);  // unlit
+    }
     for (auto& ln : lines_) ln = MakeLine(icon_);
     lv_obj_add_flag(icon_, LV_OBJ_FLAG_HIDDEN);
 
@@ -130,6 +134,7 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
 
     for (auto* d : dots_) lv_obj_add_flag(d, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(block_, LV_OBJ_FLAG_HIDDEN);
+    for (auto* o : inner_) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
     for (auto* ln : lines_) lv_obj_add_flag(ln, LV_OBJ_FLAG_HIDDEN);
 
     auto circle = [](lv_obj_t* o, int x, int y, int size, bool black) {
@@ -151,12 +156,22 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
         lv_obj_move_foreground(lines_[nl]);
         nl++;
     };
+    // Outlined cloud (2 px stroke): lit silhouette, then the same shapes inset by 2 px
+    // in the unlit colour on top. A filled cloud reads as a blob on a 128x64 OLED.
+    auto rect = [](lv_obj_t* o, int x, int y, int w, int h) {
+        lv_obj_set_pos(o, x, y);
+        lv_obj_set_size(o, w, h);
+        lv_obj_set_style_radius(o, 3, 0);
+        lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(o);
+    };
     auto cloud = [&](int dy) {
-        circle(dots_[0], 2, 9 + dy, 10, false);
-        circle(dots_[1], 8, 4 + dy, 13, false);
-        lv_obj_set_pos(block_, 4, 12 + dy);
-        lv_obj_set_size(block_, 18, 7);
-        lv_obj_remove_flag(block_, LV_OBJ_FLAG_HIDDEN);
+        circle(dots_[0], 1, 9 + dy, 11, false);
+        circle(dots_[1], 7, 3 + dy, 14, false);
+        rect(block_, 3, 12 + dy, 19, 8);
+        circle(inner_[0], 3, 11 + dy, 7, true);
+        circle(inner_[1], 9, 5 + dy, 10, true);
+        rect(inner_[2], 5, 12 + dy, 15, 6);
     };
 
     switch (kind) {
@@ -174,7 +189,7 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
         case kIconPartly:
             circle(dots_[2], 12, 1, 10, false);  // sun behind
             line({{21, 2}, {23, 0}});
-            cloud(4);
+            cloud(3);
             break;
         case kIconCloud:
             cloud(2);
