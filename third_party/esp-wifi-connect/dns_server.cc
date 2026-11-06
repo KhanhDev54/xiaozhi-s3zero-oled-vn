@@ -90,52 +90,19 @@ void DnsServer::Run() {
             break;
         }
 
-        // KenDev: build a well-formed reply. The old code appended an A record after
-        // whatever the query carried (EDNS OPT record, AAAA/HTTPS question types), which
-        // phones parse as a malformed answer and retry, delaying the captive-portal page.
-        // Now: keep only the header + first question, answer A queries with the AP
-        // address, and answer every other type with an empty NOERROR reply.
-        if (len < 12) {
-            continue;
-        }
-        int pos = 12;
-        while (pos < len && buffer[pos] != 0) {
-            pos += (uint8_t)buffer[pos] + 1;  // skip one label
-        }
-        if (pos + 5 > len) {
-            continue;  // truncated / not a normal question
-        }
-        uint16_t qtype = ((uint8_t)buffer[pos + 1] << 8) | (uint8_t)buffer[pos + 2];
-        len = pos + 5;  // end of the first question
+        // Simple DNS response: point all queries to 192.168.4.1
+        buffer[2] |= 0x80;  // Set response flag
+        buffer[3] |= 0x80;  // Set Recursion Available
+        buffer[7] = 1;      // Set answer count to 1
 
-        buffer[2] = (char)(0x84 | (buffer[2] & 0x01));  // QR=1, AA=1, keep RD
-        buffer[3] = (char)0x80;                          // RA=1, RCODE=0
-        buffer[4] = 0; buffer[5] = 1;                    // QDCOUNT = 1
-        buffer[6] = 0; buffer[7] = 0;                    // ANCOUNT
-        buffer[8] = 0; buffer[9] = 0;                    // NSCOUNT
-        buffer[10] = 0; buffer[11] = 0;                  // ARCOUNT
-
-        if (qtype == 1 && len + 16 <= (int)sizeof(buffer)) {  // A record
-            buffer[7] = 1;
-            memcpy(&buffer[len], "\xc0\x0c", 2);  // Name pointer
-            len += 2;
-            memcpy(&buffer[len], "\x00\x01\x00\x01\x00\x00\x00\x1c\x00\x04", 10);  // Type, class, TTL, data length
-            len += 10;
-            memcpy(&buffer[len], &gateway_.addr, 4);  // 192.168.4.1
-            len += 4;
-        }
-        {
-            // Log the queried name (diagnostics for slow captive-portal detection)
-            char name[96];
-            int n = 0;
-            for (int i = 12; i < pos && n < (int)sizeof(name) - 2;) {
-                int l = (uint8_t)buffer[i++];
-                if (n > 0) name[n++] = '.';
-                for (int k = 0; k < l && i < pos && n < (int)sizeof(name) - 1; k++) name[n++] = buffer[i++];
-            }
-            name[n] = 0;
-            ESP_LOGI(TAG, "DNS %s %s", qtype == 1 ? "A" : (qtype == 28 ? "AAAA" : (qtype == 65 ? "HTTPS" : "other")), name);
-        }
+        // Add answer section
+        memcpy(&buffer[len], "\xc0\x0c", 2);  // Name pointer
+        len += 2;
+        memcpy(&buffer[len], "\x00\x01\x00\x01\x00\x00\x00\x1c\x00\x04", 10);  // Type, class, TTL, data length
+        len += 10;
+        memcpy(&buffer[len], &gateway_.addr, 4);  // 192.168.4.1
+        len += 4;
+        ESP_LOGI(TAG, "Sending DNS response to %s", inet_ntoa(gateway_.addr));
 
         sendto(fd_, buffer, len, 0, (struct sockaddr *)&client_addr, client_addr_len);
     }
