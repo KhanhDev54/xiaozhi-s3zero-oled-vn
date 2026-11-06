@@ -231,6 +231,10 @@ void WifiConfigurationAp::StartWebServer()
     // 5G Network takes longer to connect
     config.recv_wait_timeout = 15;
     config.send_wait_timeout = 15;
+    // KenDev: phones fire many background connectivity checks at a captive portal.
+    // With the default 7 sockets and no purge, those can hold every socket and the
+    // browser's own request to 192.168.4.1 is refused. Drop the oldest socket instead.
+    config.lru_purge_enable = true;
     ESP_ERROR_CHECK(httpd_start(&server_, &config));
 
     // Register the index.html file
