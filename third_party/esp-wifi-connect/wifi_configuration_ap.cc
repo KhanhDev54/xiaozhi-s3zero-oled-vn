@@ -231,6 +231,13 @@ void WifiConfigurationAp::StartWebServer()
     // 5G Network takes longer to connect
     config.recv_wait_timeout = 15;
     config.send_wait_timeout = 15;
+    // KenDev: phones fire many background connectivity checks at a captive portal.
+    // With the default 7 sockets and no purge, those can hold every socket and the
+    // browser's own request to 192.168.4.1 is refused. Drop the oldest socket instead.
+    config.lru_purge_enable = true;
+    // Server-wide context for the 404 redirect handler (not owned by httpd: no-op free).
+    config.global_user_ctx = this;
+    config.global_user_ctx_free_fn = [](void*) {};
     ESP_ERROR_CHECK(httpd_start(&server_, &config));
 
     // Register the index.html file
@@ -509,6 +516,23 @@ void WifiConfigurationAp::StartWebServer()
         };
         ESP_ERROR_CHECK(httpd_register_uri_handler(server_, &redirect_uri));
     }
+
+    // KenDev: any other URL (probes we do not list, e.g. Windows /connecttest.txt or
+    // vendor-specific checks) gets the same redirect instead of a 404, so the phone
+    // recognises the captive portal on its first probe.
+    httpd_register_err_handler(server_, HTTPD_404_NOT_FOUND, [](httpd_req_t *req, httpd_err_code_t) -> esp_err_t {
+        // No URI matched, so req->user_ctx is empty: use the server-wide context.
+        auto *this_ = static_cast<WifiConfigurationAp *>(httpd_get_global_user_ctx(req->handle));
+        if (this_ == nullptr) {
+            return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, nullptr);
+        }
+        std::string url = this_->GetWebServerUrl() + "/?lang=" + this_->language_;
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", url.c_str());
+        httpd_resp_set_hdr(req, "Connection", "close");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    });
 
     // Register the /advanced/config URI
     httpd_uri_t advanced_config = {
