@@ -149,6 +149,21 @@ void WifiConfigurationAp::StartAccessPoint()
     IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
     esp_netif_dhcps_stop(ap_netif_);
     esp_netif_set_ip_info(ap_netif_, &ip_info);
+
+    // Offer 192.168.4.1 as DNS server so every lookup hits our captive DNS
+    esp_netif_dns_info_t dns_info = {};
+    dns_info.ip.u_addr.ip4.addr = ip_info.gw.addr;
+    dns_info.ip.type = ESP_IPADDR_TYPE_V4;
+    esp_netif_set_dns_info(ap_netif_, ESP_NETIF_DNS_MAIN, &dns_info);
+    uint8_t offer_dns = 1;
+    esp_netif_dhcps_option(ap_netif_, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER, &offer_dns, sizeof(offer_dns));
+
+    // DHCP option 114 (RFC 8910): tell the phone the portal URL directly so
+    // Android 11+/iOS 14+ can show the sign-in notification without waiting
+    // for its own connectivity probe. lwIP keeps the pointer -> static buffer.
+    static char captive_uri[32] = "http://192.168.4.1/";
+    esp_netif_dhcps_option(ap_netif_, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, captive_uri, strlen(captive_uri));
+
     esp_netif_dhcps_start(ap_netif_);
 
     // Start the DNS server
@@ -484,6 +499,7 @@ void WifiConfigurationAp::StartWebServer()
     auto captive_portal_handler = [](httpd_req_t *req) -> esp_err_t {
         auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
         std::string url = this_->GetWebServerUrl() + "/?lang=" + this_->language_ + "&_=" + std::to_string(esp_timer_get_time());
+        ESP_LOGI(TAG, "Captive probe %s -> redirect", req->uri);
         // Set content type to prevent browser warnings
         httpd_resp_set_type(req, "text/html");
         httpd_resp_set_status(req, "302 Found");
@@ -527,6 +543,7 @@ void WifiConfigurationAp::StartWebServer()
             return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, nullptr);
         }
         std::string url = this_->GetWebServerUrl() + "/?lang=" + this_->language_;
+        ESP_LOGI(TAG, "Unknown URL %s -> redirect", req->uri);
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", url.c_str());
         httpd_resp_set_hdr(req, "Connection", "close");

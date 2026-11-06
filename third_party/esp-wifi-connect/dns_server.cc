@@ -124,7 +124,18 @@ void DnsServer::Run() {
             memcpy(&buffer[len], &gateway_.addr, 4);  // 192.168.4.1
             len += 4;
         }
-        ESP_LOGD(TAG, "DNS reply (qtype %u)", (unsigned)qtype);
+        {
+            // Log the queried name (diagnostics for slow captive-portal detection)
+            char name[96];
+            int n = 0;
+            for (int i = 12; i < pos && n < (int)sizeof(name) - 2;) {
+                int l = (uint8_t)buffer[i++];
+                if (n > 0) name[n++] = '.';
+                for (int k = 0; k < l && i < pos && n < (int)sizeof(name) - 1; k++) name[n++] = buffer[i++];
+            }
+            name[n] = 0;
+            ESP_LOGI(TAG, "DNS %s %s", qtype == 1 ? "A" : (qtype == 28 ? "AAAA" : (qtype == 65 ? "HTTPS" : "other")), name);
+        }
 
         sendto(fd_, buffer, len, 0, (struct sockaddr *)&client_addr, client_addr_len);
     }
