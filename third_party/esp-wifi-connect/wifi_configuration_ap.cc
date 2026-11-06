@@ -158,12 +158,6 @@ void WifiConfigurationAp::StartAccessPoint()
     uint8_t offer_dns = 1;
     esp_netif_dhcps_option(ap_netif_, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER, &offer_dns, sizeof(offer_dns));
 
-    // DHCP option 114 (RFC 8910): tell the phone the portal URL directly so
-    // Android 11+/iOS 14+ can show the sign-in notification without waiting
-    // for its own connectivity probe. lwIP keeps the pointer -> static buffer.
-    static char captive_uri[32] = "http://192.168.4.1/";
-    esp_netif_dhcps_option(ap_netif_, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, captive_uri, strlen(captive_uri));
-
     esp_netif_dhcps_start(ap_netif_);
 
     // Start the DNS server
@@ -260,6 +254,7 @@ void WifiConfigurationAp::StartWebServer()
         .uri = "/",
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
+            ESP_LOGI(TAG, "Serve config page %s", req->uri);
             httpd_resp_set_hdr(req, "Connection", "close");
             httpd_resp_send(req, index_html_start, strlen(index_html_start));
             return ESP_OK;
