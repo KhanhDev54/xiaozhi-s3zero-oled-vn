@@ -115,8 +115,9 @@ void IdleScreen::Create() {
     lv_obj_clear_flag(icon_, LV_OBJ_FLAG_SCROLLABLE);
     for (auto& d : dots_) d = MakeShape(icon_, true);
     block_ = MakeShape(icon_, false);
-    for (int i = 0; i < 3; i++) {
-        inner_[i] = MakeShape(icon_, i < 2);
+    bump_ = MakeShape(icon_, true);
+    for (int i = 0; i < 4; i++) {
+        inner_[i] = MakeShape(icon_, i < 3);
         lv_obj_set_style_bg_color(inner_[i], lv_color_white(), 0);  // unlit
     }
     for (auto& ln : lines_) ln = MakeLine(icon_);
@@ -135,6 +136,7 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
     for (auto* d : dots_) lv_obj_add_flag(d, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(block_, LV_OBJ_FLAG_HIDDEN);
     for (auto* o : inner_) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(bump_, LV_OBJ_FLAG_HIDDEN);
     for (auto* ln : lines_) lv_obj_add_flag(ln, LV_OBJ_FLAG_HIDDEN);
 
     auto circle = [](lv_obj_t* o, int x, int y, int size, bool black) {
@@ -166,12 +168,15 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
         lv_obj_move_foreground(o);
     };
     auto cloud = [&](int dy) {
-        circle(dots_[0], 1, 9 + dy, 11, false);
-        circle(dots_[1], 7, 3 + dy, 14, false);
-        rect(block_, 3, 12 + dy, 19, 8);
-        circle(inner_[0], 3, 11 + dy, 7, true);
-        circle(inner_[1], 9, 5 + dy, 10, true);
-        rect(inner_[2], 5, 12 + dy, 15, 6);
+        // Three puffs (small left, big middle, small right) on a flat rounded base
+        circle(dots_[0], 0, 10 + dy, 10, false);
+        circle(dots_[1], 5, 3 + dy, 13, false);
+        circle(bump_, 13, 8 + dy, 10, false);
+        rect(block_, 3, 13 + dy, 18, 7);
+        circle(inner_[0], 2, 12 + dy, 6, true);
+        circle(inner_[1], 7, 5 + dy, 9, true);
+        circle(inner_[2], 15, 10 + dy, 6, true);
+        rect(inner_[3], 5, 13 + dy, 14, 5);
     };
 
     switch (kind) {
