@@ -149,15 +149,6 @@ void WifiConfigurationAp::StartAccessPoint()
     IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
     esp_netif_dhcps_stop(ap_netif_);
     esp_netif_set_ip_info(ap_netif_, &ip_info);
-
-    // Offer 192.168.4.1 as DNS server so every lookup hits our captive DNS
-    esp_netif_dns_info_t dns_info = {};
-    dns_info.ip.u_addr.ip4.addr = ip_info.gw.addr;
-    dns_info.ip.type = ESP_IPADDR_TYPE_V4;
-    esp_netif_set_dns_info(ap_netif_, ESP_NETIF_DNS_MAIN, &dns_info);
-    uint8_t offer_dns = 1;
-    esp_netif_dhcps_option(ap_netif_, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER, &offer_dns, sizeof(offer_dns));
-
     esp_netif_dhcps_start(ap_netif_);
 
     // Start the DNS server
@@ -240,17 +231,6 @@ void WifiConfigurationAp::StartWebServer()
     // 5G Network takes longer to connect
     config.recv_wait_timeout = 15;
     config.send_wait_timeout = 15;
-    // KenDev: phones fire many background connectivity checks at a captive portal.
-    // With the default 7 sockets and no purge, those can hold every socket and the
-    // browser's own request to 192.168.4.1 is refused. Drop the oldest socket instead.
-    config.lru_purge_enable = true;
-    // Server-wide context for the 404 redirect handler (not owned by httpd: no-op free).
-    config.global_user_ctx = this;
-    config.global_user_ctx_free_fn = [](void*) {};
-    config.open_fn = [](httpd_handle_t, int fd) -> esp_err_t {
-        ESP_LOGI(TAG, "HTTP connection opened (fd %d)", fd);
-        return ESP_OK;
-    };
     ESP_ERROR_CHECK(httpd_start(&server_, &config));
 
     // Register the index.html file
@@ -258,10 +238,8 @@ void WifiConfigurationAp::StartWebServer()
         .uri = "/",
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
-            ESP_LOGI(TAG, "Serve config page %s (fd %d)", req->uri, httpd_req_to_sockfd(req));
             httpd_resp_set_hdr(req, "Connection", "close");
-            esp_err_t err = httpd_resp_send(req, index_html_start, strlen(index_html_start));
-            ESP_LOGI(TAG, "Config page sent: %s", esp_err_to_name(err));
+            httpd_resp_send(req, index_html_start, strlen(index_html_start));
             return ESP_OK;
         },
         .user_ctx = NULL
@@ -342,7 +320,6 @@ void WifiConfigurationAp::StartWebServer()
         .uri = "/scan",
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
-            ESP_LOGI(TAG, "Page alive: /scan");
             auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
             std::lock_guard<std::mutex> lock(this_->mutex_);
 
@@ -500,7 +477,6 @@ void WifiConfigurationAp::StartWebServer()
     auto captive_portal_handler = [](httpd_req_t *req) -> esp_err_t {
         auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
         std::string url = this_->GetWebServerUrl() + "/?lang=" + this_->language_ + "&_=" + std::to_string(esp_timer_get_time());
-        ESP_LOGI(TAG, "Captive probe %s -> redirect", req->uri);
         // Set content type to prevent browser warnings
         httpd_resp_set_type(req, "text/html");
         httpd_resp_set_status(req, "302 Found");
@@ -533,24 +509,6 @@ void WifiConfigurationAp::StartWebServer()
         };
         ESP_ERROR_CHECK(httpd_register_uri_handler(server_, &redirect_uri));
     }
-
-    // KenDev: any other URL (probes we do not list, e.g. Windows /connecttest.txt or
-    // vendor-specific checks) gets the same redirect instead of a 404, so the phone
-    // recognises the captive portal on its first probe.
-    httpd_register_err_handler(server_, HTTPD_404_NOT_FOUND, [](httpd_req_t *req, httpd_err_code_t) -> esp_err_t {
-        // No URI matched, so req->user_ctx is empty: use the server-wide context.
-        auto *this_ = static_cast<WifiConfigurationAp *>(httpd_get_global_user_ctx(req->handle));
-        if (this_ == nullptr) {
-            return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, nullptr);
-        }
-        std::string url = this_->GetWebServerUrl() + "/?lang=" + this_->language_;
-        ESP_LOGI(TAG, "Unknown URL %s -> redirect", req->uri);
-        httpd_resp_set_status(req, "302 Found");
-        httpd_resp_set_hdr(req, "Location", url.c_str());
-        httpd_resp_set_hdr(req, "Connection", "close");
-        httpd_resp_send(req, NULL, 0);
-        return ESP_OK;
-    });
 
     // Register the /advanced/config URI
     httpd_uri_t advanced_config = {
