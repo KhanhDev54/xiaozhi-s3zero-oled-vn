@@ -67,7 +67,7 @@ static lv_obj_t* MakeLine(lv_obj_t* parent) {
     lv_obj_t* l = lv_line_create(parent);
     lv_obj_set_pos(l, 0, 0);
     lv_obj_set_style_line_width(l, 2, 0);
-    lv_obj_set_style_line_color(l, lv_color_white(), 0);
+    lv_obj_set_style_line_color(l, lv_color_black(), 0);
     lv_obj_set_style_line_rounded(l, true, 0);
     lv_obj_add_flag(l, LV_OBJ_FLAG_HIDDEN);
     return l;
@@ -76,7 +76,7 @@ static lv_obj_t* MakeLine(lv_obj_t* parent) {
 static lv_obj_t* MakeShape(lv_obj_t* parent, bool circle) {
     lv_obj_t* o = lv_obj_create(parent);
     lv_obj_remove_style_all(o);
-    lv_obj_set_style_bg_color(o, lv_color_white(), 0);
+    lv_obj_set_style_bg_color(o, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
     if (circle) lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
     lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -88,19 +88,19 @@ void IdleScreen::Create() {
     lv_obj_t* c = lv_obj_create(parent);
     lv_obj_remove_style_all(c);
     lv_obj_set_size(c, LV_HOR_RES, LV_VER_RES);
-    lv_obj_set_style_bg_color(c, lv_color_black(), 0);
+    lv_obj_set_style_bg_color(c, lv_color_white(), 0);
     lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
     lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(c, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t* t = lv_label_create(c);
     lv_obj_set_style_text_font(t, &lv_font_montserrat_32, 0);
-    lv_obj_set_style_text_color(t, lv_color_white(), 0);
+    lv_obj_set_style_text_color(t, lv_color_black(), 0);
     lv_label_set_text(t, "--:--");
     lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 4);
 
     lv_obj_t* l = lv_label_create(c);
-    lv_obj_set_style_text_color(l, lv_color_white(), 0);
+    lv_obj_set_style_text_color(l, lv_color_black(), 0);
     lv_obj_set_width(l, LV_HOR_RES);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_SCROLL_CIRCULAR);
@@ -135,7 +135,7 @@ void IdleScreen::DrawIcon(int code, bool is_day) {
     auto circle = [](lv_obj_t* o, int x, int y, int size, bool black) {
         lv_obj_set_pos(o, x, y);
         lv_obj_set_size(o, size, size);
-        lv_obj_set_style_bg_color(o, black ? lv_color_black() : lv_color_white(), 0);
+        lv_obj_set_style_bg_color(o, black ? lv_color_white() : lv_color_black(), 0);
         lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(o);
     };
