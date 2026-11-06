@@ -247,6 +247,10 @@ void WifiConfigurationAp::StartWebServer()
     // Server-wide context for the 404 redirect handler (not owned by httpd: no-op free).
     config.global_user_ctx = this;
     config.global_user_ctx_free_fn = [](void*) {};
+    config.open_fn = [](httpd_handle_t, int fd) -> esp_err_t {
+        ESP_LOGI(TAG, "HTTP connection opened (fd %d)", fd);
+        return ESP_OK;
+    };
     ESP_ERROR_CHECK(httpd_start(&server_, &config));
 
     // Register the index.html file
@@ -254,9 +258,10 @@ void WifiConfigurationAp::StartWebServer()
         .uri = "/",
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
-            ESP_LOGI(TAG, "Serve config page %s", req->uri);
+            ESP_LOGI(TAG, "Serve config page %s (fd %d)", req->uri, httpd_req_to_sockfd(req));
             httpd_resp_set_hdr(req, "Connection", "close");
-            httpd_resp_send(req, index_html_start, strlen(index_html_start));
+            esp_err_t err = httpd_resp_send(req, index_html_start, strlen(index_html_start));
+            ESP_LOGI(TAG, "Config page sent: %s", esp_err_to_name(err));
             return ESP_OK;
         },
         .user_ctx = NULL
@@ -337,6 +342,7 @@ void WifiConfigurationAp::StartWebServer()
         .uri = "/scan",
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
+            ESP_LOGI(TAG, "Page alive: /scan");
             auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
             std::lock_guard<std::mutex> lock(this_->mutex_);
 
