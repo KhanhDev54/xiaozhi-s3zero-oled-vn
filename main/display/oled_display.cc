@@ -166,11 +166,22 @@ void OledDisplay::SetChatMessage(const char* role, const char* content) {
     } else {
         if (content == nullptr || content[0] == '\0') {
             lv_obj_add_flag(content_right_, LV_OBJ_FLAG_HIDDEN);
+            SetMochiLarge(true);
         } else {
             lv_label_set_text(chat_message_label_, content_str.c_str());
             lv_obj_remove_flag(content_right_, LV_OBJ_FLAG_HIDDEN);
+            SetMochiLarge(false);
         }
     }
+}
+
+// KenDev: the mochi face fills the whole content area while there is no subtitle,
+// and shrinks back to the 32 px column beside the text when one is shown.
+void OledDisplay::SetMochiLarge(bool large) {
+    if (mochi_ == nullptr || content_left_ == nullptr) return;
+    int w = large ? width_ : 32;
+    lv_obj_set_width(content_left_, w);
+    mochi_->SetLayout(w, height_ - 16, large);
 }
 
 void OledDisplay::RemoveChatMessage(const char* role, const char* content) {
@@ -188,6 +199,7 @@ void OledDisplay::RemoveChatMessage(const char* role, const char* content) {
     lv_label_set_text(chat_message_label_, "");
     if (content_right_ != nullptr) {
         lv_obj_add_flag(content_right_, LV_OBJ_FLAG_HIDDEN);
+        SetMochiLarge(true);
     }
 }
 
@@ -294,6 +306,9 @@ void OledDisplay::SetupUI_128x64() {
     lv_obj_set_height(content_left_, height_ - 16);
     lv_obj_add_flag(emotion_label_, LV_OBJ_FLAG_HIDDEN);
     mochi_ = new MochiFace(content_left_, 32, height_ - 16);
+    // Start large: nothing to show beside the face yet (content_right_ is created hidden)
+    lv_obj_set_width(content_left_, width_);
+    mochi_->SetLayout(width_, height_ - 16, true);
 
     content_right_ = lv_obj_create(content_);
     lv_obj_set_size(content_right_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
