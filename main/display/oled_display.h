@@ -26,6 +26,7 @@ private:
     virtual void Unlock() override;
 
     void SetupUI_128x64();
+    void SetMochiLarge(bool large);
     void SetupUI_128x32();
 
 public:

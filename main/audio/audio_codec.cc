@@ -3,6 +3,8 @@
 #include "settings.h"
 
 #include <esp_log.h>
+#include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <driver/i2s_common.h>
 
@@ -14,7 +16,19 @@ AudioCodec::AudioCodec() {
 AudioCodec::~AudioCodec() {
 }
 
+// KenDev: peak of the PCM being played, read (and reset) by the OLED mochi face so its
+// mouth can follow the voice. Every 4th sample is enough for a loudness estimate.
+std::atomic<int> g_kendev_audio_peak{0};
+
 void AudioCodec::OutputData(std::vector<int16_t>& data) {
+    int peak = 0;
+    for (size_t i = 0; i < data.size(); i += 4) {
+        int v = std::abs((int)data[i]);
+        if (v > peak) peak = v;
+    }
+    if (peak > g_kendev_audio_peak.load(std::memory_order_relaxed)) {
+        g_kendev_audio_peak.store(peak, std::memory_order_relaxed);
+    }
     Write(data.data(), data.size());
 }
 
