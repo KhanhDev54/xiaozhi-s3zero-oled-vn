@@ -1,14 +1,19 @@
 #include "mochi_face.h"
 
+#include <atomic>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <initializer_list>
 
 #include "application.h"
 
-// Layout inside a ~32x48 area: body 30x26 centred, features relative to the body.
-static const int kBodyW = 30;
-static const int kBodyH = 25;
+// Peak of the PCM played most recently, written by AudioCodec::OutputData (KenDev).
+extern std::atomic<int> g_kendev_audio_peak;
+
+// Design units (scale 1.0): body 30x25, features placed relative to its centre/top.
+static const float kBodyW = 30.0f;
+static const float kBodyH = 25.0f;
+static const float kLargeScale = 1.5f;
 
 static lv_point_precise_t P(int x, int y) {
     lv_point_precise_t p;
@@ -26,38 +31,50 @@ MochiFace::MochiFace(lv_obj_t* parent, int width, int height) : w_(width), h_(he
 
     body_ = lv_obj_create(box_);
     lv_obj_remove_style_all(body_);
-    lv_obj_set_size(body_, kBodyW, kBodyH);
-    lv_obj_set_style_radius(body_, 12, 0);
     lv_obj_set_style_border_width(body_, 2, 0);
     lv_obj_set_style_border_color(body_, lv_color_black(), 0);
     lv_obj_clear_flag(body_, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
 
-    auto dot = [this]() {
-        lv_obj_t* o = lv_obj_create(body_);
+    // Features are siblings of the body (drawn on top of it) so every coordinate is
+    // relative to box_, which keeps the maths simple when scaling.
+    for (auto& o : dot_) {
+        o = lv_obj_create(box_);
         lv_obj_remove_style_all(o);
         lv_obj_set_style_bg_color(o, lv_color_black(), 0);
         lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
-        lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
-        return o;
-    };
-    eye_[0] = dot();
-    eye_[1] = dot();
-    cheek_[0] = dot();
-    cheek_[1] = dot();
-    mouth_ = dot();
+        lv_obj_clear_flag(o, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+    }
     for (auto& l : lines_) {
-        l = lv_line_create(body_);
+        l = lv_line_create(box_);
         lv_obj_set_style_line_width(l, 1, 0);
         lv_obj_set_style_line_color(l, lv_color_black(), 0);
+        lv_obj_set_style_line_rounded(l, false, 0);
         lv_obj_add_flag(l, LV_OBJ_FLAG_HIDDEN);
     }
-    timer_ = lv_timer_create(TimerCb, 120, this);
+    timer_ = lv_timer_create(TimerCb, 100, this);
     Draw();
 }
 
 MochiFace::~MochiFace() {
     if (timer_) lv_timer_delete(timer_);
+}
+
+void MochiFace::SetLayout(int width, int height, bool large) {
+    if (width == w_ && height == h_ && large == large_) return;
+    w_ = width;
+    h_ = height;
+    large_ = large;
+    k_ = large ? kLargeScale : 1.0f;
+    lv_obj_set_size(box_, width, height);
+    lv_obj_center(box_);
+    int lw = 2;  // 1 px diagonal lines lose pixels when thresholded to mono
+    for (auto* l : lines_) {
+        lv_obj_set_style_line_width(l, lw, 0);
+        // Rounded caps on 1 px lines leave gaps on the OLED; only round the thick ones
+        lv_obj_set_style_line_rounded(l, large, 0);
+    }
+    Draw();
 }
 
 void MochiFace::SetEmotion(const char* e) {
@@ -72,7 +89,12 @@ void MochiFace::SetEmotion(const char* e) {
     else if (is("surprised") || is("shocked") || is("embarrassed") || is("confused")) x = kSurprised;
     else if (is("sleepy")) x = kSleepy;
     else if (is("thinking")) x = kThinking;
-    expr_ = x;
+    if (x != expr_) {
+        expr_ = x;
+        // A little ear wiggle whenever the mood changes
+        ear_twitch_ = 2;
+        ear_side_ = rand() % 2;
+    }
     Draw();
 }
 
@@ -86,144 +108,230 @@ void MochiFace::Animate() {
     bool speaking = state == kDeviceStateSpeaking;
     bool listening = state == kDeviceStateListening;
     bool busy = state == kDeviceStateConnecting || state == kDeviceStateActivating;
+    bool dirty = false;
 
-    // Breathing bob: up/down by 1 px, faster while listening
-    int period = listening ? 8 : 16;
+    // Mouth follows the loudness of what is being played (peak since last tick).
+    int peak = g_kendev_audio_peak.exchange(0);
+    int target = 0;
+    if (speaking) {
+        if (peak > 9000) target = 3;
+        else if (peak > 3500) target = 2;
+        else if (peak > 900) target = 1;
+    }
+    int new_mouth = target >= mouth_ ? target : mouth_ - 1;  // open fast, close gently
+
+    // Breathing bob: 1 px, faster while listening; a loud syllable also squashes it.
+    int period = listening ? 10 : 20;
     int new_bob = ((tick_ / period) % 2) ? 1 : 0;
+    if (speaking && new_mouth >= 2) new_bob = 1;
+
     // Blink every 2.5-5 s (not when sleepy)
     if (blink_ > 0) {
         blink_--;
+        dirty = true;
     } else if (--next_blink_ <= 0 && expr_ != kSleepy) {
         blink_ = 1;
-        next_blink_ = 20 + rand() % 22;
+        next_blink_ = 25 + rand() % 25;
+        dirty = true;
     }
+
+    // Ear twitch every now and then
+    if (ear_twitch_ > 0) {
+        ear_twitch_--;
+        dirty = true;
+    } else if (rand() % 70 == 0) {
+        ear_twitch_ = 2;
+        ear_side_ = rand() % 2;
+        dirty = true;
+    }
+
     // Glance around while listening / thinking / connecting
     int new_look = 0;
     if (listening || busy || expr_ == kThinking) {
-        int phase = (tick_ / 12) % 4;
+        int phase = (tick_ / 14) % 4;
         new_look = phase == 1 ? -1 : (phase == 3 ? 1 : 0);
     }
-    // Talking mouth
-    bool new_mouth = speaking ? (rand() % 3 != 0) && (tick_ % 2 == 0 || rand() % 2) : false;
 
-    if (new_bob != bob_ || new_look != look_ || new_mouth != mouth_open_ || blink_ > 0 || tick_ % 10 == 0) {
+    // Floating heart / z in large mode
+    if (large_ && (expr_ == kLove || expr_ == kSleepy) && tick_ % 2 == 0) {
+        float_ = (float_ + 1) % 16;
+        dirty = true;
+    }
+
+    if (dirty || new_bob != bob_ || new_look != look_ || new_mouth != mouth_) {
         bob_ = new_bob;
         look_ = new_look;
-        mouth_open_ = new_mouth;
+        mouth_ = new_mouth;
         Draw();
     }
 }
 
+int MochiFace::S(float v) const { return (int)lroundf(v * k_); }
+
 void MochiFace::HideAll() {
-    for (auto* o : {eye_[0], eye_[1], cheek_[0], cheek_[1], mouth_}) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+    for (auto* o : dot_) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
     for (auto* l : lines_) lv_obj_add_flag(l, LV_OBJ_FLAG_HIDDEN);
+    used_lines_ = 0;
 }
 
-void MochiFace::SetLine(int i, std::initializer_list<lv_point_precise_t> pts) {
+void MochiFace::ShowDot(int i, int x, int y, int w, int h) {
+    lv_obj_set_pos(dot_[i], x, y);
+    lv_obj_set_size(dot_[i], w < 1 ? 1 : w, h < 1 ? 1 : h);
+    lv_obj_remove_flag(dot_[i], LV_OBJ_FLAG_HIDDEN);
+}
+
+int MochiFace::AddLine(std::initializer_list<lv_point_precise_t> pts) {
+    if (used_lines_ >= kLines) return -1;
+    int i = used_lines_++;
     int n = 0;
     for (auto& p : pts) {
-        if (n < 3) pts_[i][n++] = p;
+        if (n < kMaxPts) pts_[i][n++] = p;
     }
     lv_line_set_points(lines_[i], pts_[i], n);
     lv_obj_remove_flag(lines_[i], LV_OBJ_FLAG_HIDDEN);
+    return i;
 }
 
 void MochiFace::Draw() {
-    // Body position (bob)
-    int bx = (w_ - kBodyW) / 2;
-    int by = (h_ - kBodyH) / 2 + 2 + bob_;
-    lv_obj_set_pos(body_, bx, by);
-    // Squash a little when bobbing down: wider & shorter = soft mochi feel
-    lv_obj_set_size(body_, kBodyW + (bob_ ? 1 : 0), kBodyH - (bob_ ? 1 : 0));
-
     HideAll();
-    const int ex0 = 7 + look_, ex1 = 17 + look_, ey = 8;  // inner coords (border 2 px)
-    auto eye = [this](int i, int x, int y, int w, int h) {
-        lv_obj_set_pos(eye_[i], x, y);
-        lv_obj_set_size(eye_[i], w, h);
-        lv_obj_remove_flag(eye_[i], LV_OBJ_FLAG_HIDDEN);
-    };
-    int li = 0;
-    bool closed = blink_ > 0;
 
+    // Body: soft rounded blob, squashed a little (wider & shorter) when bobbing down
+    int bw = S(kBodyW) + bob_;
+    int bh = S(kBodyH) - bob_;
+    int bx = (w_ - bw) / 2;
+    int by = large_ ? (h_ - S(kBodyH) - 2) : ((h_ - S(kBodyH)) / 2 + 2);
+    by += bob_ * 2;  // the top drops by 2 when squashed so the bottom stays on the "floor"
+    lv_obj_set_pos(body_, bx, by);
+    lv_obj_set_size(body_, bw, bh);
+    lv_obj_set_style_radius(body_, S(12), 0);
+    int cx = bx + bw / 2;
+
+    // Cat ears on top of the body. Droop when sad/sleepy, one bends during a twitch.
+    bool droop = expr_ == kSad || expr_ == kSleepy;
+    for (int side = 0; side < 2; side++) {
+        int d = side == 0 ? -1 : 1;
+        float tip_x = droop ? 14.0f : 10.0f;
+        float tip_y = droop ? -2.0f : -5.0f;
+        if (ear_twitch_ > 0 && ear_side_ == side) {
+            tip_x += 2.5f;
+            tip_y += 2.0f;
+        }
+        AddLine({P(cx + d * S(12), by + S(4)), P(cx + d * S(tip_x), by + S(tip_y)),
+                 P(cx + d * S(4), by + S(0.5f))});
+    }
+
+    // Eyes
+    bool closed = blink_ > 0;
+    int ew = S(4), eh = S(5);
+    int ey = by + S(9.5f);  // top of the eye dots
+    int exl = cx - S(5) + look_ * S(1);
+    int exr = cx + S(5) + look_ * S(1);
+    auto closed_eyes = [&]() {
+        AddLine({P(exl - S(2), ey + S(3)), P(exl + S(2), ey + S(3))});
+        AddLine({P(exr - S(2), ey + S(3)), P(exr + S(2), ey + S(3))});
+    };
     switch (expr_) {
         case kHappy:
-        case kLove:
-            // ^ ^ eyes
-            SetLine(li++, {P(ex0 - 1, ey + 3), P(ex0 + 1, ey), P(ex0 + 3, ey + 3)});
-            SetLine(li++, {P(ex1 - 1, ey + 3), P(ex1 + 1, ey), P(ex1 + 3, ey + 3)});
-            if (expr_ == kLove) {
-                lv_obj_set_pos(cheek_[0], 2, 13);
-                lv_obj_set_size(cheek_[0], 3, 2);
-                lv_obj_set_pos(cheek_[1], 21, 13);
-                lv_obj_set_size(cheek_[1], 3, 2);
-                lv_obj_remove_flag(cheek_[0], LV_OBJ_FLAG_HIDDEN);
-                lv_obj_remove_flag(cheek_[1], LV_OBJ_FLAG_HIDDEN);
+        case kLove:  // ^ ^
+            AddLine({P(exl - S(2), ey + S(3.5f)), P(exl, ey + S(0.5f)), P(exl + S(2), ey + S(3.5f))});
+            AddLine({P(exr - S(2), ey + S(3.5f)), P(exr, ey + S(0.5f)), P(exr + S(2), ey + S(3.5f))});
+            break;
+        case kSad:  // eyes with brows sloping down to the sides
+            AddLine({P(exl + S(2), ey), P(exl - S(2), ey + S(1.5f))});
+            AddLine({P(exr - S(2), ey), P(exr + S(2), ey + S(1.5f))});
+            if (closed) {
+                closed_eyes();
+            } else {
+                ShowDot(0, exl - S(1.5f), ey + S(2.5f), S(3), S(3));
+                ShowDot(1, exr - S(1.5f), ey + S(2.5f), S(3), S(3));
             }
             break;
-        case kSad:
-            SetLine(li++, {P(ex0, ey + 1), P(ex0 + 3, ey + 3)});
-            SetLine(li++, {P(ex1 + 3, ey + 1), P(ex1, ey + 3)});
-            break;
-        case kAngry:
-            SetLine(li++, {P(ex0 - 1, ey - 1), P(ex0 + 3, ey + 1)});
-            SetLine(li++, {P(ex1 + 4, ey - 1), P(ex1, ey + 1)});
+        case kAngry:  // brows sloping down to the middle
+            AddLine({P(exl - S(2.5f), ey - S(1)), P(exl + S(2), ey + S(1))});
+            AddLine({P(exr + S(2.5f), ey - S(1)), P(exr - S(2), ey + S(1))});
             if (!closed) {
-                eye(0, ex0, ey + 2, 3, 3);
-                eye(1, ex1 + 1, ey + 2, 3, 3);
+                ShowDot(0, exl - S(1), ey + S(2), S(3), S(3));
+                ShowDot(1, exr - S(2), ey + S(2), S(3), S(3));
             }
             break;
         case kSleepy:
-            SetLine(li++, {P(ex0, ey + 3), P(ex0 + 4, ey + 3)});
-            SetLine(li++, {P(ex1, ey + 3), P(ex1 + 4, ey + 3)});
+            closed_eyes();
             break;
         case kSurprised:
             if (closed) {
-                SetLine(li++, {P(ex0, ey + 3), P(ex0 + 4, ey + 3)});
-                SetLine(li++, {P(ex1, ey + 3), P(ex1 + 4, ey + 3)});
+                closed_eyes();
             } else {
-                eye(0, ex0, ey, 5, 6);
-                eye(1, ex1, ey, 5, 6);
+                ShowDot(0, exl - S(2.5f), ey - S(0.5f), S(5), S(6));
+                ShowDot(1, exr - S(2.5f), ey - S(0.5f), S(5), S(6));
             }
             break;
-        default:  // neutral / thinking
+        default:  // neutral / thinking (thinking looks a bit up)
             if (closed) {
-                SetLine(li++, {P(ex0, ey + 3), P(ex0 + 3, ey + 3)});
-                SetLine(li++, {P(ex1, ey + 3), P(ex1 + 3, ey + 3)});
+                closed_eyes();
             } else {
-                eye(0, ex0, ey + (expr_ == kThinking ? -1 : 0), 4, 5);
-                eye(1, ex1, ey + (expr_ == kThinking ? -1 : 0), 4, 5);
+                int up = expr_ == kThinking ? S(1) : 0;
+                ShowDot(0, exl - ew / 2, ey - up, ew, eh);
+                ShowDot(1, exr - ew / 2, ey - up, ew, eh);
             }
             break;
     }
 
-    // Mouth
-    const int mx = 11, my = 15;
-    if (mouth_open_) {
-        lv_obj_set_pos(mouth_, mx, my - 1);
-        lv_obj_set_size(mouth_, 5, 4);
-        lv_obj_remove_flag(mouth_, LV_OBJ_FLAG_HIDDEN);
+    // Blush: always in large mode (except sad/angry), only when loving in small mode
+    int my = by + S(18);
+    bool blush = large_ ? (expr_ != kSad && expr_ != kAngry && expr_ != kSleepy) : expr_ == kLove;
+    if (blush) {
+        int bo = large_ ? S(11.5f) : 10;  // keep it off the body outline in small mode
+        int bwid = large_ ? S(4) : 3;
+        ShowDot(2, cx - bo, my - S(2), bwid, S(2));
+        ShowDot(3, cx + bo - bwid, my - S(2), bwid, S(2));
+    }
+
+    // Mouth: opens with the voice while speaking
+    if (mouth_ > 0) {
+        int mh = S(1.0f + mouth_ * 1.3f);
+        int mw = S(4.0f + mouth_ * 0.5f);
+        ShowDot(4, cx - mw / 2, my - mh / 2, mw, mh);
     } else {
         switch (expr_) {
             case kHappy:
             case kLove:
-                SetLine(li++, {P(mx - 1, my), P(mx + 2, my + 2), P(mx + 5, my)});
+                AddLine({P(cx - S(3), my - S(1)), P(cx, my + S(1.5f)), P(cx + S(3), my - S(1))});
                 break;
             case kSad:
             case kAngry:
-                SetLine(li++, {P(mx - 1, my + 2), P(mx + 2, my), P(mx + 5, my + 2)});
+                AddLine({P(cx - S(3), my + S(1.5f)), P(cx, my - S(0.5f)), P(cx + S(3), my + S(1.5f))});
                 break;
             case kSurprised:
-                lv_obj_set_pos(mouth_, mx + 1, my - 1);
-                lv_obj_set_size(mouth_, 3, 3);
-                lv_obj_remove_flag(mouth_, LV_OBJ_FLAG_HIDDEN);
+                ShowDot(4, cx - S(1.5f), my - S(1.5f), S(3), S(3));
                 break;
             case kSleepy:
-                SetLine(li++, {P(mx, my + 1), P(mx + 4, my + 1)});
+                AddLine({P(cx - S(2), my), P(cx + S(2), my)});
                 break;
-            default:
-                SetLine(li++, {P(mx, my + 1), P(mx + 2, my + 2), P(mx + 4, my + 1)});
+            default:  // small cat mouth "w"
+                AddLine({P(cx - S(3), my - S(0.5f)), P(cx - S(1.5f), my + S(1)), P(cx, my - S(0.5f)),
+                         P(cx + S(1.5f), my + S(1)), P(cx + S(3), my - S(0.5f))});
                 break;
+        }
+    }
+
+    // Floating heart / z beside the face (large mode only, there is no room otherwise)
+    if (large_) {
+        int off = float_ < 8 ? float_ : 16 - float_;  // 0..8..0, slow up and down
+        if (expr_ == kLove) {
+            int hx = cx + S(24);
+            int hy = by + S(9) - off;
+            int u = (float_ % 4 < 2) ? 2 : 3;  // gentle heartbeat
+            AddLine({P(hx, hy + 2 * u), P(hx - 2 * u, hy), P(hx - 2 * u, hy - u), P(hx - u, hy - 2 * u),
+                     P(hx, hy - u), P(hx + u, hy - 2 * u), P(hx + 2 * u, hy - u), P(hx + 2 * u, hy),
+                     P(hx, hy + 2 * u)});
+        } else if (expr_ == kSleepy) {
+            int zx = cx + S(21);
+            int zy = by + S(4) - off / 2;
+            AddLine({P(zx, zy), P(zx + 5, zy), P(zx, zy + 5), P(zx + 5, zy + 5)});
+            if (float_ >= 6 && float_ <= 13) {
+                int zx2 = zx + 8, zy2 = zy - 7;
+                AddLine({P(zx2, zy2), P(zx2 + 3, zy2), P(zx2, zy2 + 3), P(zx2 + 3, zy2 + 3)});
+            }
         }
     }
 }
